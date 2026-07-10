@@ -119,6 +119,10 @@ Route::group(['prefix' => 'admin', 'middleware' => 'AdminAuth'], function () {
   //set rates
   Route::get('/rate/set-rates', [AdminController::class, 'setRates']);
   Route::post('/rateUpdate', [AdminController::class, 'rateUpdate'])->name('rateUpdate');
+  Route::get('/mlm-settings', [AdminController::class, 'mlmSettings']);
+  Route::post('/mlm-settings', [AdminController::class, 'mlmSettingsUpdate'])->name('mlmSettingsUpdate');
+  Route::get('/packages', [AdminController::class, 'packages']);
+  Route::post('/packages/{id}/status', [AdminController::class, 'packageStatusChange'])->name('packageStatusChange');
 
   //member-gallery
   Route::get('/member-gallery', [AdminController::class, 'memGallery']);

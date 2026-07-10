@@ -33,6 +33,14 @@
                     <a href="{{ url('admin/rate/set-rates') }}"><i class="ik ik-bar-chart"></i><span>Set Rates</span>
                     </a>
                 </div>
+                <div class="nav-item {{ $segment2 == 'mlm-settings' ? 'active' : '' }}">
+                    <a href="{{ url('admin/mlm-settings') }}"><i class="ik ik-settings"></i><span>MLM Settings</span>
+                    </a>
+                </div>
+                <div class="nav-item {{ $segment2 == 'packages' ? 'active' : '' }}">
+                    <a href="{{ url('admin/packages') }}"><i class="ik ik-box"></i><span>Packages</span>
+                    </a>
+                </div>
                 <div class="nav-item {{ $segment1 == 'rest-api' ? 'active' : '' }}">
                     <a href="{{ url('admin/deposit-details') }}"><i class="ik ik-box"></i><span>Deposit Details</span>
                     </a>

@@ -13,9 +13,11 @@ use App\Models\PaymentDetail;
 use App\Models\ImportFund;
 use App\Models\LevelIncome;
 use App\Models\MemberDetail;
+use App\Models\Package;
 use App\Models\PackageDetail;
 use App\Models\RankIncome;
 use App\Models\SetRate;
+use App\Models\Setting;
 use App\Models\StakingDetail;
 use App\Models\StakingIncome;
 use App\Models\WithdrawalRequest;
@@ -658,6 +660,70 @@ class AdminController extends Controller
         $var->roi_rate = $request->post('rate');
         $var->save();
         session()->flash('successMsg', 'Rates updated successfully.');
+        return redirect()->back();
+    }
+
+    private const MLM_SETTING_KEYS = [
+        'direct_referral_percentage',
+        'binary_matching_percentage',
+        'maximum_income_percentage',
+        'minimum_withdrawal',
+        'withdrawal_fee_percentage',
+        'withdrawal_status',
+        'p2p_transfer_fee_percentage',
+        'p2p_transfer_status',
+        'deposit_status',
+        'trading_reward_status',
+        'binary_closing_status',
+        'binary_closing_time',
+    ];
+
+    public function mlmSettings()
+    {
+        $result['settings'] = collect(self::MLM_SETTING_KEYS)
+            ->mapWithKeys(fn ($key) => [$key => Setting::get($key)])
+            ->toArray();
+        return view('admin.settings.mlm-settings')->with($result);
+    }
+
+    public function mlmSettingsUpdate(Request $request)
+    {
+        $request->validate([
+            'direct_referral_percentage' => 'required|numeric|min:0',
+            'binary_matching_percentage' => 'required|numeric|min:0',
+            'maximum_income_percentage' => 'required|numeric|min:0',
+            'minimum_withdrawal' => 'required|numeric|min:0',
+            'withdrawal_fee_percentage' => 'required|numeric|min:0',
+            'withdrawal_status' => 'required|in:enabled,disabled',
+            'p2p_transfer_fee_percentage' => 'required|numeric|min:0',
+            'p2p_transfer_status' => 'required|in:enabled,disabled',
+            'deposit_status' => 'required|in:enabled,disabled',
+            'trading_reward_status' => 'required|in:enabled,disabled',
+            'binary_closing_status' => 'required|in:enabled,disabled',
+            'binary_closing_time' => 'required',
+        ]);
+
+        foreach ($request->only(self::MLM_SETTING_KEYS) as $key => $value) {
+            Setting::set($key, $value);
+        }
+
+        session()->flash('successMsg', 'Settings updated successfully.');
+        return redirect()->back();
+    }
+
+    public function packages()
+    {
+        $result['data'] = Package::orderBy('sort_order')->get();
+        return view('admin.packages')->with($result);
+    }
+
+    public function packageStatusChange(Request $request, $id)
+    {
+        $package = Package::findOrFail($id);
+        $package->is_active = !$package->is_active;
+        $package->save();
+
+        session()->flash('successMsg', 'Package status updated successfully.');
         return redirect()->back();
     }
 }
