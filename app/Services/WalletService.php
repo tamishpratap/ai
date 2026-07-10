@@ -110,6 +110,10 @@ class WalletService
      */
     public function transferFunds(string $senderMemberid, string $receiverMemberid, float $amount): array
     {
+        if (Setting::get('p2p_transfer_status', 'enabled') !== 'enabled') {
+            throw new RuntimeException('P2P transfers are temporarily disabled. Please try again later.');
+        }
+
         if ($senderMemberid === $receiverMemberid) {
             throw new RuntimeException('You can not transfer money to your own account.');
         }

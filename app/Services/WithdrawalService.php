@@ -20,6 +20,10 @@ class WithdrawalService
      */
     public function requestWithdrawal(string $memberid, float $amount): array
     {
+        if (Setting::get('withdrawal_status', 'enabled') !== 'enabled') {
+            throw new RuntimeException('Withdrawals are temporarily disabled. Please try again later.');
+        }
+
         return DB::transaction(function () use ($memberid, $amount) {
             $member = MemberDetail::where('memberid', $memberid)->lockForUpdate()->first();
             if (!$member) {

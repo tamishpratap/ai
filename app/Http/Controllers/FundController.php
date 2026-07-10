@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ImportFund;
 use App\Models\PaymentDetail;
 use App\Models\MemberDetail;
 use App\Models\FundRequest;
 use App\Models\SetRate;
+use App\Models\Setting;
 use App\Models\WalletTransfer;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
@@ -30,6 +32,11 @@ class FundController extends Controller
             'txnid' => 'required',
             'image' => 'required'
         ]);
+
+        if (Setting::get('deposit_status', 'enabled') !== 'enabled') {
+            session()->flash('failedMsg', 'Deposits are temporarily disabled. Please try again later.');
+            return redirect()->back();
+        }
 
         if ($request->post('amount') < 0) {
             session()->flash('failedMsg', 'Invalid amount input. Please change amount value');
@@ -82,7 +89,23 @@ class FundController extends Controller
         $qry->p2p_wallet += $amount;
         $qry->save();
 
-        p2pwalletTransfer($memberid, $amount, 'debit', $p2pwallet, 'P2P Fund Transfer', 'Fund requested transfered into user fund wallet');
+        p2pwalletTransfer($memberid, $amount, 'debit', $p2pwallet, 'P2P Fund Transfer', 'Fund requested transfered into user fund wallet', $var->tran_id);
+
+        // Mirrored here so admin's existing add-funds reporting (ImportFund-backed) stays
+        // complete now that the member-facing self-credit path (FundController::addFund,
+        // removed - it let members credit any wallet with an unvalidated amount) is gone.
+        $importFund = new ImportFund();
+        $importFund->memberid = $memberid;
+        $importFund->orderid = 'FR' . $var->id;
+        $importFund->txnid = $var->tran_id;
+        $importFund->amount = $amount;
+        $importFund->type = 'Add';
+        $importFund->mode = 'Manual';
+        $importFund->status = 'Approved';
+        $importFund->added_by = 'Admin';
+        $importFund->wallet_type = 'P2P Wallet';
+        $importFund->save();
+
         session()->flash('successMsg', 'Fund request has been accepted successfully');
         return redirect()->back();
     }
