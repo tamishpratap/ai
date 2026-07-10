@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Models\Setting;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -11,6 +12,7 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         \App\Console\Commands\DailyIncomeDis::class,
         \App\Console\Commands\LevelIncomeDis::class,
+        \App\Console\Commands\BinaryDailyClosing::class,
     ];
     /**
      * Define the application's command schedule.
@@ -19,6 +21,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('app:daily-income-dis')->daily();
         $schedule->command('app:level-income-dis')->daily();
+        $schedule->command('binary:daily-closing')->dailyAt(Setting::get('binary_closing_time', '23:59'));
     }
 
     /**

@@ -59,89 +59,9 @@
                                     <label class="form-label">Investment Package</label>
                                     <select class="form-select" id="stak_package" name="stak_package">
                                         <option value="">Select Package</option>
-                                        @if ($data['package'] == 0)
-                                            <option value="10">$10</option>
-                                            <option value="25">$25</option>
-                                            <option value="50">$50</option>
-                                            <option value="100">$100</option>
-                                            <option value="250">$250</option>
-                                            <option value="500">$500</option>
-                                            <option value="1000">$1,000</option>
-                                            <option value="2500">$2,500</option>
-                                            <option value="5000">$5,000</option>
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 10)
-                                            <option value="10">$10</option>
-                                            <option value="25">$25</option>
-                                            <option value="50">$50</option>
-                                            <option value="100">$100</option>
-                                            <option value="250">$250</option>
-                                            <option value="500">$500</option>
-                                            <option value="1000">$1,000</option>
-                                            <option value="2500">$2,500</option>
-                                            <option value="5000">$5,000</option>
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 25)
-                                            <option value="25">$25</option>
-                                            <option value="50">$50</option>
-                                            <option value="100">$100</option>
-                                            <option value="250">$250</option>
-                                            <option value="500">$500</option>
-                                            <option value="1000">$1,000</option>
-                                            <option value="2500">$2,500</option>
-                                            <option value="5000">$5,000</option>
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 50)
-                                            <option value="50">$50</option>
-                                            <option value="100">$100</option>
-                                            <option value="250">$250</option>
-                                            <option value="500">$500</option>
-                                            <option value="1000">$1,000</option>
-                                            <option value="2500">$2,500</option>
-                                            <option value="5000">$5,000</option>
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 100)
-                                            <option value="100">$100</option>
-                                            <option value="250">$250</option>
-                                            <option value="500">$500</option>
-                                            <option value="1000">$1,000</option>
-                                            <option value="2500">$2,500</option>
-                                            <option value="5000">$5,000</option>
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 250)
-                                            <option value="250">$250</option>
-                                            <option value="500">$500</option>
-                                            <option value="1000">$1,000</option>
-                                            <option value="2500">$2,500</option>
-                                            <option value="5000">$5,000</option>
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 1000)
-                                            <option value="1000">$1,000</option>
-                                            <option value="2500">$2,500</option>
-                                            <option value="5000">$5,000</option>
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 2500)
-                                            <option value="2500">$2,500</option>
-                                            <option value="5000">$5,000</option>
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 5000)
-                                            <option value="5000">$5,000</option>
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 10000)
-                                            <option value="10000">$10,000</option>
-                                            <option value="25000">$25,000</option>
-                                        @elseif ($data['package'] == 25000)
-                                            <option value="25000">$25,000</option>
-                                        @endif
+                                        @foreach ($packages as $package)
+                                            <option value="{{ (int) $package->amount }}">{{ $package->name }} (${{ number_format($package->amount, 0) }})</option>
+                                        @endforeach
                                     </select>
                                     @error('stak_package')
                                         <span class="text-danger"> {{ $message }}</span>

@@ -9,6 +9,17 @@ class DirectIncome extends Model
 {
     use HasFactory;
 
+    protected $fillable = [
+        'memberid',
+        'directid',
+        'package',
+        'amount',
+        'source_type',
+        'source_id',
+        'reference',
+        'status',
+    ];
+
     protected $casts = [
         'amount' => 'decimal:8',
     ];

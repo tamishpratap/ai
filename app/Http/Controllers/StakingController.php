@@ -3,11 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\MemberDetail;
-use App\Models\StackingIncome;
+use App\Models\Package;
 use App\Models\StakingDetail;
-use App\Models\SetRate;
-use App\Models\PackageDetail;
 use App\Models\StakingIncome;
+use App\Services\PackageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -17,7 +16,10 @@ class StakingController extends Controller
     {
         $memberid = session('MEMBER_ID');
         $result['data'] = MemberDetail::where('memberid', $memberid)->first();
-        // $result['p_data'] = StakingDetail::all();
+        $result['packages'] = Package::where('is_active', true)
+            ->where('amount', '>', $result['data']->package)
+            ->orderBy('sort_order')
+            ->get();
         return view('member.staking.staking', $result);
     }
 
@@ -37,76 +39,62 @@ class StakingController extends Controller
         return view('member.staking.staking-incomes')->with($result);
     }
 
-    public function createStaking(Request $request)
+    public function createStaking(Request $request, PackageService $packageService)
     {
         $request->validate([
             'memberid' => 'required',
-            'stak_package' => 'required',
+            'stak_package' => 'required|numeric',
             'txn_password' => 'required'
         ]);
 
         $memberid = session('MEMBER_ID');
-        $txn_pas = $request->post('txn_password');
-        $amount = $request->post('stak_package');
+        $amount = (float) $request->post('stak_package');
+        $member = MemberDetail::where('memberid', $memberid)->first();
 
-        $memUpdate = MemberDetail::where('memberid', $memberid)->first();
-        $sponsorid = $memUpdate->sponsorid;
-        $p2p_wallet = $memUpdate->p2p_wallet;
-        $txn_password = $memUpdate->txn_password;
-        $type = 'Staking';
-        $rates = SetRate::find(1);
-
-        $allowedPackages = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000];
-        if (!in_array((int)$amount, $allowedPackages, true)) {
-            session()->flash('failedMsg', 'Invalid package selected. Allowed packages: $10, $25, $50, $100, $250, $500, $1,000, $2,500, $5,000, $10,000, $25,000');
-            return redirect()->back();
-        }
-        if (!Hash::check($txn_pas, $txn_password)) {
+        if (!Hash::check($request->post('txn_password'), $member->txn_password)) {
             session()->flash('failedMsg', 'Entered Transaction Password do not match');
             return redirect()->back();
         }
-        if ($p2p_wallet < $amount) {
-            session()->flash('failedMsg', 'There is no enough balance in your wallet to stake this amount');
+
+        try {
+            if ((float) $member->package > 0) {
+                $packageService->upgradePackage($memberid, $amount);
+            } else {
+                $packageService->activatePackage($memberid, $amount);
+            }
+        } catch (\Throwable $e) {
+            session()->flash('failedMsg', $e->getMessage());
             return redirect()->back();
         }
 
-        $var = new StakingDetail();
-        $var->memberid = $memberid;
-        $var->invest_date = date('Y-m-d H:i:s');
-        $var->invest_amount = $amount;
-        $var->package = $amount;
-        $var->status = 'Active';
-        $var->rate = $rates->roi_rate;
-        $var->save();
-
-        $pack = new PackageDetail();
-        $pack->txn_date = date('Y-m-d H:i:s');
-        $order_id = "OD" . time();
-        $pack->order_id = $order_id;
-        $pack->payment_mode = 'Online';
-        $pack->memberid = $memberid;
-        $pack->package_value = $amount;
-        $pack->package_type = $type;
-        $pack->save();
-
-        $p2p_wallet = $memUpdate->p2p_wallet;
-        $memUpdate->self_biz += $amount;
-        $memUpdate->team_biz += $amount;
-        $memUpdate->p2p_wallet -= $amount;
-        $memUpdate->package = $amount;
-
-        if ($memUpdate->status == 'Temp') {
-            $memUpdate->status = 'Active';
-            $memUpdate->activated_at = date('Y-m-d H:i:s');
-            updateDownline($sponsorid);
-            updateUpline($sponsorid, $memberid);
-        }
-        $memUpdate->save();
-
-        team_invest_update($sponsorid, $amount);
-        walletTransfer($memberid, $amount, 'credit', $p2p_wallet, 'Investment Created', 'Investment creation amount has been deducted from fund wallet');
-
         session()->flash('successMsg', 'Investment has been created successfully.');
+        return redirect()->back();
+    }
+
+    public function createStakingTopup(Request $request, PackageService $packageService)
+    {
+        $request->validate([
+            'stak_package' => 'required|numeric',
+            'txn_password' => 'required'
+        ]);
+
+        $memberid = session('MEMBER_ID');
+        $amount = (float) $request->post('stak_package');
+        $member = MemberDetail::where('memberid', $memberid)->first();
+
+        if (!Hash::check($request->post('txn_password'), $member->txn_password)) {
+            session()->flash('failedMsg', 'Entered Transaction Password do not match');
+            return redirect()->back();
+        }
+
+        try {
+            $packageService->upgradePackage($memberid, $amount);
+        } catch (\Throwable $e) {
+            session()->flash('failedMsg', $e->getMessage());
+            return redirect()->back();
+        }
+
+        session()->flash('successMsg', 'Package has been upgraded successfully.');
         return redirect()->back();
     }
     
