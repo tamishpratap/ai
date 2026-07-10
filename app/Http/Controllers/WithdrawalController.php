@@ -4,11 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\MemberDetail;
 use App\Models\WalletTransfer;
-use App\Models\Admin;
 use App\Models\SetRate;
 use App\Models\WithdrawalRequest;
+use App\Services\WithdrawalService;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Http\Request;
 
 class WithdrawalController extends Controller
@@ -47,103 +46,33 @@ class WithdrawalController extends Controller
         return redirect()->back();
     }
 
-    public function initWithdrawal(Request $request)
+    public function initWithdrawal(Request $request, WithdrawalService $withdrawalService)
     {
         $request->validate([
-            'amount' => 'required',
+            'amount' => 'required|numeric',
             'txn_password' => 'required',
         ]);
 
         $memberid = $request->post('memberid');
-        $amount = $request->post('amount');
+        $amount = (float) $request->post('amount');
         $txnPass = $request->post('txn_password');
 
-        // $service = $amount / 100 * 5; // 5% service charge
-        // $netAmount = $amount - $service;
-        $totalAmount = $amount;
-        $date = date('Y-m-d H:i:s');
-        $requestid = "RQ" . time();
-
         $mem = MemberDetail::where('memberid', $memberid)->first();
-        $wallet = $mem->wallet;
-        $tPassword = $mem['txn_password'];
-        if ($mem['wallet_address'] == '' || $mem['wallet_address'] == null) {
-            session()->flash('failedMsg', 'Your wallet address is not completed. Plase fill your wallet address before withdrawal');
-            return redirect()->back();
-        }
 
-        $check = WithdrawalRequest::where([['memberid', $memberid], ['status', 'Pending']])->count();
-        if ($check > 0) {
-            session()->flash('failedMsg', 'Your Last Withdrawal Still Pending. Please Wait');
-            return redirect()->back();
-        }
-
-        if ($amount < 10) {
-            session()->flash('failedMsg', 'Invalid Amount Entered. Amount must be grater than 10$');
-            return redirect()->back();
-        }
-
-
-        if ($amount > $wallet) {
-            session()->flash('failedMsg', 'Invalid Amount Entered. Amount can not be greater than wallet balance');
-            return redirect()->back();
-        }
-
-        if (!Hash::check($txnPass, $tPassword)) {
+        if (!Hash::check($txnPass, $mem->txn_password)) {
             session()->flash('failedMsg', 'Enter Transaction password do not match. Please check and try again');
             return redirect()->back();
         }
 
-
-        $mem->wallet -= $totalAmount;
-        $mem->save();
-
-        $var = new WithdrawalRequest();
-        $var->request_date = $date;
-        $var->request_id = $requestid;
-        $var->memberid = $memberid;
-        $var->name = $mem->name;
-        $var->type = 'Online';
-        $var->wallet_address = $mem->wallet_address;
-        $var->gross_amount = $totalAmount;
-        $var->service_charge = 0;
-        $var->net_amount = $totalAmount;
-        $var->save();
-
-        walletTransfer($memberid, $totalAmount, 'credit', $wallet, 'Withdrawal', ' $ ' . $totalAmount . ' have been withdrawl by Member from wallet. Payment Id-' . $var->request_id);
-
-        $mailData = [
-            'request_id' => $requestid,
-            'email' => $mem->email,
-            'memberid' => $memberid,
-            'gross' => $var->gross_amount,
-            'service' => $var->service_charge,
-            'social' => $var->social_service,
-            'support' => $var->support,
-            'net' => $var->net_amount,
-            'date' => date('Y-m-d H:i:s'),
-            'name' => $mem->name,
-            'wallet' => $mem->wallet_address,
-            'type' => 'Wallet'
-        ];
-
-        // $user['to'] = 'arbitx007@gmail.com';
-        // Mail::send('member.mails.withdrawal-request', $mailData, function ($message) use ($user) {
-
-        //     $message->to($user['to']);
-        //     $message->subject('Arbitx Member Withdrawal Request');
-        // });
+        try {
+            $withdrawalService->requestWithdrawal($memberid, $amount);
+        } catch (\Throwable $e) {
+            session()->flash('failedMsg', $e->getMessage());
+            return redirect()->back();
+        }
 
         session()->flash('successMsg', 'Withdrawal request has been created successfully. Amount will be transfered into wallet after transaction validation.');
         return redirect()->back();
-    }
-
-    public function withdrawalaccept(Request $request, $id)
-    {
-        $aid = session('ADMIN_ID');
-        $result['adm_data'] = Admin::find($aid);
-        $result['data'] = WithdrawalRequest::find($id);
-        return view('admin.withdrawal-accept')->with($result);
     }
 
     public function withdrlHistory()

@@ -19,6 +19,7 @@ use App\Models\SetRate;
 use App\Models\StakingDetail;
 use App\Models\StakingIncome;
 use App\Models\WithdrawalRequest;
+use App\Services\WithdrawalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -414,95 +415,36 @@ class AdminController extends Controller
         return view('admin.payment-history')->with($result);
     }
 
-    public function wAcceptOnline($id)
-    {
-        $result['wdata'] = WithdrawalRequest::find($id);
-        $memberid = $result['wdata']['memberid'];
-        $option = $result['wdata']['payment_option'];
-        $result['udata'] = MemberDetail::where('memberid', $memberid)->first();
-        $result['wallet'] = $result['wdata']['wallet_address'];
-
-        return view('admin.withdrawal-accept')->with($result);
-    }
-
-    public function withdrawalAccept(Request $request)
-    {
-        $id = $request->post('wid');
-        $txnid = $request->post('txnid');
-        $wallet = $request->post('wallet');
-
-        $var = WithdrawalRequest::find($id);
-        $memberid = $var->memberid;
-        $wdl_amount = $var->gross_amount;
-        $var->txnid = $txnid;
-        $var->wallet_address = $wallet;
-        $var->status = 'Approved';
-        $var->save();
-
-        $qry = MemberDetail::where('memberid', $memberid)->first();
-        $name = $qry->name;
-        $sponsorid = $qry->sponsorid;
-        $type = 'Withdrawal';
-
-        return response()->json([
-            'code' => 1
-        ]);
-    }
-
-    public function wAccept(Request $request, $id)
+    public function wAccept(Request $request, $id, WithdrawalService $withdrawalService)
     {
         $request->validate([
             'transaction_hash' => 'required|string|max:255',
             'comment' => 'nullable|string',
         ]);
 
-        $var = WithdrawalRequest::find($id);
-        if (!$var) {
-            session()->flash('wMessage', 'Withdrawal request not found.');
+        try {
+            $withdrawalService->approveWithdrawal((int) $id, $request->post('transaction_hash'), $request->post('comment'));
+        } catch (\Throwable $e) {
+            session()->flash('wMessage', $e->getMessage());
             return redirect()->back();
         }
-
-        $memberid = $var->memberid;
-        $var->txnid = $request->post('transaction_hash');
-        $var->admin_comment = $request->post('comment');
-        $var->status = 'Approved';
-        $var->payment_date = date('Y-m-d');
-        $var->save();
-
-        $qry = MemberDetail::where('memberid', $memberid)->first();
-        $name = $qry->name;
-        $sponsorid = $qry->sponsorid;
-        $type = 'Withdrawal';
 
         session()->flash('wMessage', 'Withdrawal request has been accepted successfully!');
         return redirect('/admin/new-withdrawal-request');
     }
 
-    public function wCancel(Request $request, $id)
+    public function wCancel(Request $request, $id, WithdrawalService $withdrawalService)
     {
         $request->validate([
             'comment' => 'nullable|string',
         ]);
 
-        $var = WithdrawalRequest::find($id);
-        if (!$var) {
-            session()->flash('wMessage', 'Withdrawal request not found.');
+        try {
+            $withdrawalService->rejectWithdrawal((int) $id, $request->post('comment'));
+        } catch (\Throwable $e) {
+            session()->flash('wMessage', $e->getMessage());
             return redirect()->back();
         }
-
-        $memberid = $var->memberid;
-        $amount = $var->gross_amount;
-        $var->admin_comment = $request->post('comment');
-        $var->status = 'Cancelled';
-        $var->save();
-
-        $qry = MemberDetail::where('memberid', $memberid)->first();
-
-        $wallet = $qry->p2p_wallet;
-        $qry->wallet += $amount;
-        $qry->save();
-
-        walletTransfer($memberid, $amount, 'debit', $wallet, 'Withdrawal Cancelled', ' $ ' . $amount . ' have been added to fund wallet due to withdrawal request cancellation');
 
         session()->flash('wMessage', 'Withdrawal request has been rejected successfully!');
         return redirect('/admin/new-withdrawal-request');

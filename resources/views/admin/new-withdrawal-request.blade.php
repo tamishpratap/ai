@@ -72,9 +72,6 @@
                                             <td>$ {{ number_format($list['gross_amount'],2) }}</td>
                                             <td>$ {{ number_format($list['service_charge'],2) }}</td>
                                             <td>$ {{ number_format($list['net_amount'],2) }}</td>
-                                            {{-- <td class="px-0">
-                                                <a href="{{url('admin/withdrawal/accept-online')}}/{{$list['id']}}" class="btn btn-sm btn-success mx-1">Online Pay</a>
-                                            </td> --}}
                                             <td class="px-0">
                                                 <a href="{{ url('admin/withdrawal/withdrawal-comment') }}/{{ $list['id'] }}"
                                                     class="btn btn-sm btn-info mx-">Withdrawal Comment</a>

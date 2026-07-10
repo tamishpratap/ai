@@ -64,13 +64,9 @@ Route::group(['prefix' => 'admin', 'middleware' => 'AdminAuth'], function () {
   Route::get('/payment-history', [AdminController::class, 'paymentHistory']);
   // Route::get('/gateway-request', [AdminController::class, 'gatewayRequest']);
 
-  Route::get('/withdrawal/accept-online/{id}', [AdminController::class, 'wAcceptOnline']);
-  // Route::get('/withdrawal-accept/{id}', [WithdrawalController::class, 'withdrawalaccept']);
   Route::post('/sendWdlRequest', [WithdrawalController::class, 'sendWdlRequest'])->name('sendWdlRequest');
   Route::post('/withdrawal/accept/{id}', [AdminController::class, 'wAccept'])->name('withdrawal.accept');
   Route::post('/withdrawal/cancel/{id}', [AdminController::class, 'wCancel'])->name('withdrawal.cancel');
-  Route::post('/withdrawalAccept', [AdminController::class, 'withdrawalAccept'])->name('withdrawalAccept');
-  Route::post('/withdrawalAcceptOnline', [WithdrawalController::class, 'withdrawalAcceptOnline'])->name('withdrawalAcceptOnline');
 
   Route::get('/package-details', [AdminController::class, 'packageDetails']);
   // Route::get('/new-withdrawal-request', [AdminController::class, 'withdrawals']);
@@ -236,7 +232,6 @@ Route::group(['prefix' => 'member', 'middleware' => 'MemberAuth'], function () {
   Route::post('/MbReplyTicket', [SupportController::class, 'MbReplyTicket'])->name('MbReplyTicket');
 
   Route::post('balValidate', [WithdrawalController::class, 'balValidate'])->name('balValidate');
-  Route::post('getPrivateKey', [WithdrawalController::class, 'getPrivateKey'])->name('getPrivateKey');
   Route::post('initiate-withdrawal', [WithdrawalController::class, 'withdrawal'])->name('initiate-withdrawal');
 
   //gallery
