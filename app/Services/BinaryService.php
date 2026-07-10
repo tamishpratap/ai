@@ -100,7 +100,12 @@ class BinaryService
 
         foreach ($memberIds as $memberid) {
             $result = DB::transaction(function () use ($memberid, $closingDate, $percentage) {
-                if (BinaryIncome::where('memberid', $memberid)->where('closing_date', $closingDate)->exists()) {
+                // whereDate() (not where()) because closing_date is cast to 'date' on the model,
+                // which normalizes it to a full datetime string on save - a raw string-equality
+                // where() against the plain 'Y-m-d' input would never match, silently defeating
+                // this idempotency check (confirmed while testing: it let a duplicate row through
+                // and only the unique index caught it).
+                if (BinaryIncome::where('memberid', $memberid)->whereDate('closing_date', $closingDate)->exists()) {
                     return null;
                 }
 

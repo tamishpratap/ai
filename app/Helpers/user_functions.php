@@ -58,22 +58,23 @@ function userUnread($ticketid)
 
 function updateUpline($sponsorid, $memberid)
 {
-    if ($memberid != 'GAB123456') {
-        $pool = UplineMember::where('memberid', $sponsorid)->first();
-        $var = new UplineMember();
-        $var->memberid = $memberid;
-        $var->upline_1 = $pool->memberid;
-        $var->upline_2 = $pool->upline_1;
-        $var->upline_3 = $pool->upline_2;
-        $var->upline_4 = $pool->upline_3;
-        $var->upline_5 = $pool->upline_4;
-        $var->upline_6 = $pool->upline_5;
-        $var->upline_7 = $pool->upline_6;
-        $var->upline_8 = $pool->upline_7;
-        $var->upline_9 = $pool->upline_8;
-        $var->upline_10 = $pool->upline_9;
-        $var->save();
-    }
+    // The sponsor may not have their own upline row yet (e.g. they're the top-of-tree member,
+    // or 'Root' itself) - treat that as "no known ancestors" instead of crashing.
+    $pool = UplineMember::where('memberid', $sponsorid)->first();
+
+    $var = new UplineMember();
+    $var->memberid = $memberid;
+    $var->upline_1 = optional($pool)->memberid;
+    $var->upline_2 = optional($pool)->upline_1;
+    $var->upline_3 = optional($pool)->upline_2;
+    $var->upline_4 = optional($pool)->upline_3;
+    $var->upline_5 = optional($pool)->upline_4;
+    $var->upline_6 = optional($pool)->upline_5;
+    $var->upline_7 = optional($pool)->upline_6;
+    $var->upline_8 = optional($pool)->upline_7;
+    $var->upline_9 = optional($pool)->upline_8;
+    $var->upline_10 = optional($pool)->upline_9;
+    $var->save();
 }
 
 function totalsingleLevel($memberid, $level)
