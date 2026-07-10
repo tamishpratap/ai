@@ -8,4 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 class BinaryIncome extends Model
 {
     use HasFactory;
+
+    protected $casts = [
+        'closing_date' => 'date',
+    ];
 }

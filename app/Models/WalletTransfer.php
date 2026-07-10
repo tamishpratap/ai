@@ -8,4 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 class WalletTransfer extends Model
 {
     use HasFactory;
+
+    protected $casts = [
+        'balance_before' => 'decimal:8',
+    ];
 }

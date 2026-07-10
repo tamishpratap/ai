@@ -8,4 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 class StakingDetail extends Model
 {
     use HasFactory;
+
+    protected $casts = [
+        'is_upgrade' => 'boolean',
+    ];
 }

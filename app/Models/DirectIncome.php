@@ -8,4 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 class DirectIncome extends Model
 {
     use HasFactory;
+
+    protected $casts = [
+        'amount' => 'decimal:8',
+    ];
 }

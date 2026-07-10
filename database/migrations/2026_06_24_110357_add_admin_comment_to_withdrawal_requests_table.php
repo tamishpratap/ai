@@ -11,6 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // This project's tables were originally created directly in MySQL, outside Laravel's
+        // migration system, so admin_comment may already exist live even though this migration
+        // has never actually run here — guard keeps it safe against either starting state.
+        if (Schema::hasColumn('withdrawal_requests', 'admin_comment')) {
+            return;
+        }
+
         Schema::table('withdrawal_requests', function (Blueprint $table) {
             $table->text('admin_comment')->nullable()->after('status');
         });
@@ -22,7 +29,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('withdrawal_requests', function (Blueprint $table) {
-            $table->dropColumn('admin_comment');
+            if (Schema::hasColumn('withdrawal_requests', 'admin_comment')) {
+                $table->dropColumn('admin_comment');
+            }
         });
     }
 };
