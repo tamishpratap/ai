@@ -124,10 +124,8 @@ class MemberDetailController extends Controller
         $var->mobile = $request->post('mobile');
         $password =  $request->post('password');
         $var->password = Hash::make($password);
-        // $txnpass = rand(100000, 999999); 
-        $txnpass = 123456; 
+        $txnpass = rand(100000, 999999);
         $var->txn_password = Hash::make($txnpass);
-        $var->p2p_wallet = 1000000;
         $var->country = $request->post('country');
         $var->position = $request->post('position');
         $var->save();

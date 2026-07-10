@@ -14,44 +14,56 @@ use App\Models\SetRate;
 use App\Models\SpecialTradingBonus;
 use Illuminate\Support\Facades\Date;
 
-function walletTransfer($memberid, $amount, $type, $wallet, $walletType, $text)
+function walletTransfer($memberid, $amount, $type, $wallet, $walletType, $text, $reference = null, $status = 'Completed')
 {
     if ($type == 'debit') {
         $ins = new WalletTransfer();
         $ins->memberid = $memberid;
         $ins->walletType = $walletType;
         $ins->debit = $amount;
+        $ins->balance_before = $wallet;
         $ins->balance = $wallet + $amount;
         $ins->particular = $text;
+        $ins->masterid = $reference;
+        $ins->status = $status;
         $ins->save();
     } elseif ($type == 'credit') {
         $ins = new WalletTransfer();
         $ins->memberid = $memberid;
         $ins->walletType = $walletType;
         $ins->credit = $amount;
+        $ins->balance_before = $wallet;
         $ins->balance = $wallet - $amount;
         $ins->particular = $text;
+        $ins->masterid = $reference;
+        $ins->status = $status;
         $ins->save();
     }
 }
 
-function p2pwalletTransfer($memberid, $amount, $type, $p2pwallet, $walletType, $text)
+function p2pwalletTransfer($memberid, $amount, $type, $p2pwallet, $walletType, $text, $reference = null, $status = 'Completed')
 {
     if ($type == 'debit') {
         $ins = new WalletTransfer();
         $ins->memberid = $memberid;
         $ins->walletType = $walletType;
         $ins->debit = $amount;
+        $ins->balance_before = $p2pwallet;
         $ins->balance = $p2pwallet + $amount;
         $ins->particular = $text;
+        $ins->masterid = $reference;
+        $ins->status = $status;
         $ins->save();
     } elseif ($type == 'credit') {
         $ins = new WalletTransfer();
         $ins->memberid = $memberid;
         $ins->walletType = $walletType;
         $ins->credit = $amount;
+        $ins->balance_before = $p2pwallet;
         $ins->balance = $p2pwallet - $amount;
         $ins->particular = $text;
+        $ins->masterid = $reference;
+        $ins->status = $status;
         $ins->save();
     }
 }
