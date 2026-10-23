@@ -1,5 +1,6 @@
 <?php
 return [
-    'name' => 'Gain Arbitrage Bot',
-    'url'=>'https://gainarbitragebot.com'
+    'name' => 'Quantum ARB',
+    'url'=>'https://qunatumarb.world/',
+
 ];

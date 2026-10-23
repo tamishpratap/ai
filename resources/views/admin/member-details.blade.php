@@ -33,6 +33,7 @@
 
     <div class="row">
         <div class="col-md-12">
+            @include('admin.partials.history-date-filter')
             <div class="card">
                 <div class="card-header"><h3>{{ __('Member Details')}}</h3></div>
                     <div class="card-body px-3" style="overflow: auto">

@@ -12,7 +12,8 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         \App\Console\Commands\DailyIncomeDis::class,
         \App\Console\Commands\LevelIncomeDis::class,
-        \App\Console\Commands\BinaryDailyClosing::class,
+        \App\Console\Commands\RewardGen::class,
+        \App\Console\Commands\ApproveWithdrawal::class,
     ];
     /**
      * Define the application's command schedule.
@@ -21,7 +22,8 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('app:daily-income-dis')->daily();
         $schedule->command('app:level-income-dis')->daily();
-        $schedule->command('binary:daily-closing')->dailyAt(Setting::get('binary_closing_time', '23:59'));
+        $schedule->command('app:reward-gen')->everyFiveMinutes();
+        $schedule->command('app:approve-withdrawal')->everyFiveMinutes();
     }
 
     /**

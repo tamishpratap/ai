@@ -43,8 +43,8 @@
                             </a>
                         </div>
                         <p>Welcome back! </p>
-                        @if (session()->has('accessMsg'))
-                            <span class="text-danger text-center">{{ session('accessMsg') }}</span>
+                        @if (session()->has('OtpMsg'))
+                            <span class="text-danger text-center">{{ session('OtpMsg') }}</span>
                         @endif
                         @if (session()->has('loginmsg'))
                             <div class="alert alert-danger mb-3">{{ session('loginmsg') }}</div>
@@ -56,9 +56,9 @@
                                 <a href="{{ url('/send-admin-otp') }}" class="btn btn-custom text-white pt-2">Send
                                     OTP</a>
                                     <br>
-                                @if (session()->has('admin_otp'))
-                                    <span class="text-danger text-center">{{ session('admin_otp') }}</span>
-                                @endif
+                                <!--@if (session()->has('admin_otp'))-->
+                                <!--    <span class="text-danger text-center">{{ session('admin_otp') }}</span>-->
+                                <!--@endif-->
                             </div>
 
                             <div class="form-group">

@@ -33,6 +33,7 @@
 
         <div class="row">
             <div class="col-md-12">
+            @include('admin.partials.history-date-filter')
                 @if (session()->has('wMessage'))
                 <div class="alert alert-primary">{{session('wMessage')}}</div>
                 @endif

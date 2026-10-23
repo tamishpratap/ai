@@ -6,6 +6,7 @@ use App\Models\Country;
 use App\Models\DashMessage;
 use App\Models\MemberDetail;
 use App\Models\SetRate;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -53,6 +54,7 @@ class MemberDetailController extends Controller
             if (Hash::check($password, $hashed)) {
                 $request->session()->put('MEMBER_LOGIN', true);
                 $request->session()->put('MEMBER_ID', $result->memberid);
+                $request->session()->put('show_popup_modal', true);
                 return redirect('member/dashboard');
             } else {
                 session()->flash('failedmsg', 'Please enter valid Password to login');
@@ -94,7 +96,7 @@ class MemberDetailController extends Controller
 
         $request->validate([
             'sponsor' => 'required|exists:member_details,memberid',
-            'position' => 'required',
+            // 'position' => 'required',
             'name' => 'required',
             'email' => 'required|email',
             'mobile' => 'required|min:10|max:10',
@@ -111,11 +113,13 @@ class MemberDetailController extends Controller
         //     session()->flash('failedMsg', 'Your account is not activated.');
         //     return redirect()->back();
         // }
-        $emailCount = MemberDetail::where('email', $email)->count();
-        if ($emailCount >= 3) {
-            session()->flash('failedMsg', 'This email has already been used 3 times. Please use another email.');
-            return redirect()->back();
-        }
+        
+        // $emailCount = MemberDetail::where('email', $email)->count();
+        // if ($emailCount >= 3) {
+        //     session()->flash('failedMsg', 'This email has already been used 3 times. Please use another email.');
+        //     return redirect()->back();
+        // }
+        
         $var  = new MemberDetail();
         $var->memberid = userId();
         $var->sponsorid = $sponsorid;
@@ -125,12 +129,12 @@ class MemberDetailController extends Controller
         $password =  $request->post('password');
         $var->password = Hash::make($password);
         $txnpass = rand(100000, 999999);
+        // $var->p2p_wallet = 100000;
         $var->txn_password = Hash::make($txnpass);
         $var->country = $request->post('country');
-        $var->position = $request->post('position');
         $var->save();
         
-        addPlacementId($var->memberid, $request->post('sponsor'), $request->post('position'));
+        
         updateUpline($sponsorid, $var->memberid);
         
         $data = MemberDetail::find($var->id);
@@ -138,8 +142,6 @@ class MemberDetailController extends Controller
         $email = $data->email;
         $name = $data->name;
         $mobile = $data->mobile;
-        $placementid = $data->placementid;
-        binary_count_update($userid, $placementid, $request->post('position'));
         if ($email != '') {
             $mailData = [
                 'name' => $name,
@@ -150,11 +152,11 @@ class MemberDetailController extends Controller
                 'txn_password' => $txnpass
             ];
             $user['to'] = $email;
-            // Mail::send('member.mails.mail', $mailData, function ($message) use ($user) {
+            Mail::send('member.mails.mail', $mailData, function ($message) use ($user) {
 
-            //     $message->to($user['to']);
-            //     $message->subject('Diode Member Login Credentials');
-            // });
+                $message->to($user['to']);
+                $message->subject('Quantum ARB Member Login Credentials');
+            });
         }
         $request->session()->put('name', $request->post('name'));
         $request->session()->put('memberid', $userid);
@@ -177,6 +179,34 @@ class MemberDetailController extends Controller
         $result['data'] = MemberDetail::where('memberid', $memberid)->first();
         $result['dashMsg'] = DashMessage::orderby('rank', 'asc')->get();
         $result['rate'] = SetRate::find(1);
+
+        $totalCapping = 0.0;
+        $achievedCapping = 0.0;
+
+        if (!empty($memberid) && !empty($result['data'])) {
+            $totalCapping = (float) capping($memberid);
+            $achievedCapping = (float) Income3xachieved($memberid);
+        }
+
+        $remainingCapping = max(0.0, $totalCapping - $achievedCapping);
+        $cappingPercentage = ($totalCapping > 0)
+            ? min(100.0, max(0.0, ($achievedCapping / $totalCapping) * 100.0))
+            : 0.0;
+
+        $result['totalCapping'] = $totalCapping;
+        $result['achievedCapping'] = $achievedCapping;
+        $result['remainingCapping'] = $remainingCapping;
+        $result['cappingPercentage'] = $cappingPercentage;
+
+        $popupImage = Setting::get('dashboard_popup_image', '');
+        $popupStatus = Setting::get('dashboard_popup_status', '1');
+        $popupTitle = Setting::get('dashboard_popup_title', '');
+        $popupLink = Setting::get('dashboard_popup_link', '');
+
+        $result['popupImage'] = ($popupStatus == '1' && !empty($popupImage) && file_exists(public_path('uploads/' . $popupImage))) ? $popupImage : null;
+        $result['popupTitle'] = $popupTitle;
+        $result['popupLink'] = $popupLink;
+
         return view('member.dashboard')->with($result);
     }
 
@@ -441,11 +471,11 @@ class MemberDetailController extends Controller
                     'password' => $password
                 ];
                 $user['to'] = $email;
-                // Mail::send('member.mails.forget-password-mail', $mailData, function ($message) use ($user) {
+                Mail::send('member.mails.forget-password-mail', $mailData, function ($message) use ($user) {
 
-                //     $message->to($user['to']);
-                //     $message->subject('Gain Arbitrage Bot Member Account Password');
-                // });
+                    $message->to($user['to']);
+                    $message->subject('Quantum ARB Member Account Password');
+                });
             }
             session()->flash('succMsg', 'Your Account Password has been sent to your registered email.');
             return redirect()->back();
@@ -508,7 +538,7 @@ class MemberDetailController extends Controller
         $var->position = $request->post('position');
         $var->save();
 
-        addPlacementId($var->memberid, $request->post('sponsor'), $request->post('position'));
+        // addPlacementId($var->memberid, $request->post('sponsor'), $request->post('position'));
         updateUpline($sponsorid, $var->memberid);
 
         $data = MemberDetail::find($var->id);
@@ -517,7 +547,7 @@ class MemberDetailController extends Controller
         $name = $data->name;
         $mobile = $data->mobile;
         $placementid = $data->placementid;
-        binary_count_update($userid, $placementid, $request->post('position'));
+        // binary_count_update($userid, $placementid, $request->post('position'));
         if ($email != '') {
             $mailData = [
                 'name' => $name,
@@ -528,11 +558,11 @@ class MemberDetailController extends Controller
                 'txn_password' => $txnpass
             ];
             $user['to'] = $email;
-            // Mail::send('member.mails.mail', $mailData, function ($message) use ($user) {
+            Mail::send('member.mails.mail', $mailData, function ($message) use ($user) {
 
-            //     $message->to($user['to']);
-            //     $message->subject('Gain Arbitrage Bot Member Login Credentials');
-            // });
+                $message->to($user['to']);
+                $message->subject('Quantum ARB Member Login Credentials');
+            });
         }
         $request->session()->put('name', $request->post('name'));
         $request->session()->put('memberid', $userid);

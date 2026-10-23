@@ -35,49 +35,46 @@
                                             class="table dataTable table-bordered text-nowrap w-100">
                                             <thead>
                                                 <tr>
-                                                    <th>S.No</th>
-                                                    <th>Date</th>
-                                                    <th>Memberid</th>
-                                                    <th>Level</th>
-                                                    <th>Package</th>
-                                                    <th>Level Id</th>
-                                                    <th>Name</th>
-                                                    <th>Amount</th>
-                                                    <th>Status</th>
-                                                </tr>
+                                                 <tr>
+                                        <th>{{ __('S.No')}}</th>
+                                        <!--<th>{{ __('Date')}}</th>-->
+                                        <th>{{ __('Memberid')}}</th>
+                                        <th>{{ __('Level')}}</th>
+                                        <th>{{ __('Downline ')}}</th>
+                                        <th>{{ __('Level Id ')}}</th>
+                                        <th>{{ __('Name')}}</th>
+                                        <th>{{ __('Package')}}</th>
+                                        <th>{{ __('Rate ')}}</th>
+                                        <th>{{ __('Amount ')}}</th>
+                                        <th>{{ __('Status')}}</th>
+                                                 </tr>
                                             </thead>
-                                            <tbody>
-                                                @php
-                                                    $i = 1;
-                                                @endphp
-                                                @foreach ($levelData as $list)
-                                                    @php
-                                                        $mdata = getAllData($list['memberid']);
-                                                    @endphp
-                                                    <tr>
-                                                        <td>{{ $i }}</td>
-                                                        <td>{{ date('d-m-Y', strtotime($list['created_at'])) }}</td>
-                                                        <td>{{ $list['memberid'] }}</td>
-                                                        <td>{{ $list['level'] }}</td>
-                                                        <td>$ {{ number_format($list['package'], 2) }}</td>
-                                                        <td>{{ $list['level_id'] }}</td>
-                                                        <td>{{ getname($list['level_id']) }}</td>
-                                                        <td>$ {{ $list['amount'] }}</td>
-                                                        <td>
-                                                            @if ($list['status'] == 'Paid')
-                                                                <label
-                                                                    class="btn btn-sm btn-success">{{ $list['status'] }}</label>
-                                                            @else
-                                                                <label
-                                                                    class="btn btn-sm btn-danger">{{ $list['status'] }}</label>
-                                                            @endif
-                                                        </td>
-                                                    </tr>
-                                                    @php
-                                                        $i++;
-                                                    @endphp
-                                                @endforeach
-                                            </tbody>
+                                           <tbody>
+                                    @php $i = 1;  @endphp
+                                    @foreach ($levelData as $list )
+                                        <tr>
+                                            <td>{{$i}}</td>
+                                            <!--<td>{{date('d-m-Y', strtotime($list['created_at']))}}</td>-->
+                                            <td>{{$list['memberid']}}</td>
+                                            <td>{{$list['level']}}</td>
+                                            <td>{{$list['downline']}}</td>
+                                            <td>{{$list['level_id']}}</td>
+                                            <td>{{$list['name']}}</td>
+                                            <td>$ {{number_format($list['staking_income'], 2)}}</td>
+                                            <td>{{$list['rate']}}%</td>
+                                            <td>$ {{ $list['amount'] }}</td>
+                                            
+                                            <td>
+                                                @if ($list['status'] == 'Paid')
+                                                <label class="btn btn-sm btn-success">{{$list['status']}}</label>
+                                                @else
+                                                <label class="btn btn-sm btn-danger">{{$list['status']}}</label>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                        @php $i++;  @endphp
+                                    @endforeach
+                                </tbody>
                                         </table>
                                     </div>
                                 </div>

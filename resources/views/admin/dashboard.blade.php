@@ -185,7 +185,7 @@
                     <div class="card product-progress-card">
                         <div class="card-block">
                             <div class="row pp-main">
-                                <div class="col-xl-4 col-md-6  mt-3">
+                                <div class="col-xl-12 col-md-6  mt-3">
                                     <div class="pp-cont">
                                         <div class="row align-items-center mb-20">
                                             <div class="row col-auto">
@@ -206,7 +206,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-xl-4 col-md-6  mt-3">
+                                <div class="col-xl-6 col-md-6  mt-3">
                                     <div class="pp-cont">
                                         <div class="row align-items-center mb-20">
                                             <div class="row col-auto">
@@ -214,7 +214,7 @@
                                                 <h5 class="mb-0 mx-3">Staking Income</h5>
                                             </div>
                                             <div class="col text-right">
-                                                <h4 class="mb-0 text-yellow">${{ number_format(totalStakingInc(), 2) }} </h4>
+                                                <h4 class="mb-0 text-success">${{ number_format(totalStakingInc(), 2) }} </h4>
                                             </div>
                                         </div>
                                         <div class="row align-items-center mb-15">
@@ -223,11 +223,53 @@
                                             </div>
                                         </div>
                                         <div class="progress">
+                                            <div class="progress-bar bg-success" style="width:27%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-xl-6 col-md-6  mt-3">
+                                    <div class="pp-cont">
+                                        <div class="row align-items-center mb-20">
+                                            <div class="row col-auto">
+                                                <i class="fas fa-tag f-24 text-mute mx-2"></i>
+                                                <h5 class="mb-0 mx-3">Direct Income</h5>
+                                            </div>
+                                            <div class="col text-right">
+                                                <h4 class="mb-0 text-yellow">${{ number_format(totalDirectInc(), 2) }} </h4>
+                                            </div>
+                                        </div>
+                                        <div class="row align-items-center mb-15">
+                                            <div class="col-auto">
+                                                <p class="mb-0">Total Direct Income</p>
+                                            </div>
+                                        </div>
+                                        <div class="progress">
                                             <div class="progress-bar bg-yellow" style="width:27%"></div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-xl-4 col-md-6 mt-3">
+                                <div class="col-xl-6 col-md-6  mt-3">
+                                    <div class="pp-cont">
+                                        <div class="row align-items-center mb-20">
+                                            <div class="row col-auto">
+                                                <i class="fas fa-tag f-24 text-mute mx-2"></i>
+                                                <h5 class="mb-0 mx-3">Reward Income</h5>
+                                            </div>
+                                            <div class="col text-right">
+                                                <h4 class="mb-0 text-yellow">${{ number_format(totalRewardInc(), 2) }} </h4>
+                                            </div>
+                                        </div>
+                                        <div class="row align-items-center mb-15">
+                                            <div class="col-auto">
+                                                <p class="mb-0">Total Reward Income</p>
+                                            </div>
+                                        </div>
+                                        <div class="progress">
+                                            <div class="progress-bar bg-yellow" style="width:27%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-xl-6 col-md-6 mt-3">
                                     <div class="pp-cont">
                                         <div class="row align-items-center mb-20">
                                             <div class="row col-auto">

@@ -88,16 +88,16 @@
         </div>
         <div class="col-xxl-6 col-xl-6 col-lg-12">
             <div class="row justify-content-center align-items-center h-100 member-auth-shell">
-                <div class="col-xxl-8 col-xl-9 col-lg-8 col-md-8 col-sm-10 col-12">
+                <div class="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-12">
                     <div class="card member-auth-card shadow-none my-4">
                         <form action="{{ route('memretrivePassword') }}" method="post">
                             @csrf
                             <div class="card-body">
-                                <div class="member-auth-head">
+                                <div class="member-auth-head  justify-content-center">
                                     <a href="{{ url('/') }}">
                                         <img src="{{ asset('logo/logo.png') }}" alt="logo" width="80px">
                                     </a>
-                                    <span class="member-auth-icon"><i class="ti ti-lock"></i></span>
+                                    <!--<span class="member-auth-icon"><i class="ti ti-lock"></i></span>-->
                                 </div>
 
                                 <div class="member-auth-form-wrap">

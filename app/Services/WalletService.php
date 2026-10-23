@@ -122,7 +122,7 @@ class WalletService
             throw new RuntimeException('Transfer amount must be greater than zero.');
         }
 
-        $feePercentage = (float) Setting::get('p2p_transfer_fee_percentage', 5);
+        $feePercentage = (float) Setting::get('p2p_transfer_fee_percentage', 0);
         $fee = round($amount * $feePercentage / 100, 8);
         $netAmount = $amount - $fee;
         $reference = 'P2P-' . Str::upper(Str::random(12));

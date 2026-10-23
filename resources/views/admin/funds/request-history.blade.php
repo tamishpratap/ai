@@ -1,5 +1,5 @@
 @extends('admin.layouts.main')
-@section('title', 'Fund Request History')
+@section('title', 'Import Fund History')
 @section('content')
     @push('head')
         <link rel="stylesheet" href="{{ asset('adm_assets/assets/plugins/DataTables/datatables.min.css') }}">
@@ -11,7 +11,7 @@
                     <div class="page-header-title">
                         <i class="ik ik-edit bg-blue"></i>
                         <div class="d-inline">
-                            <h5>{{ __('Fund Request History') }}</h5>
+                            <h5>{{ __('Import Fund History') }}</h5>
                             <span>{{ __('All Fund Request History') }}</span>
                         </div>
                     </div>
@@ -23,7 +23,7 @@
                                 <a href="#"><i class="ik ik-home"></i></a>
                             </li>
                             <li class="breadcrumb-item"><a href="#">{{ __('Admin') }}</a></li>
-                            <li class="breadcrumb-item active" aria-current="page">{{ __('Fund Request History') }}</li>
+                            <li class="breadcrumb-item active" aria-current="page">{{ __('Import Fund History') }}</li>
                         </ol>
                     </nav>
                 </div>
@@ -33,6 +33,7 @@
 
         <div class="row">
             <div class="col-md-12">
+            @include('admin.partials.history-date-filter')
                 @if (session()->has('actMsg'))
                     <div class="alert alert-success" role="alert">{{ session('actMsg') }}</div>
                 @endif
@@ -41,7 +42,7 @@
                 @endif
                 <div class="card">
                     <div class="card-header">
-                        <h3>{{ __('Fund Request History') }}</h3>
+                        <h3>{{ __('Import Fund History') }}</h3>
                     </div>
                     <div class="card-body px-5" style="overflow: auto">
                         <table id="data_table" class="table">
@@ -50,8 +51,8 @@
                                     <th>{{ __('S.No') }}</th>
                                     <th>{{ __('Request Date') }}</th>
                                     <th>{{ __('Memberid') }}</th>
+                                    <th>{{ __('Type') }}</th>
                                     <th>{{ __('TxnId') }}</th>
-                                    <!--<th>{{ __('Type') }}</th>-->
                                     {{-- <th>{{ __('USDG Amount') }}</th> --}}
                                     <th>{{ __('USDT Amount') }}</th>
                                     <th>{{ __('Image') }}</th>
@@ -66,8 +67,8 @@
                                         <td>{{ $i }}</td>
                                         <td>{{ date('d-m-Y', strtotime($list['created_at'])) }}</td>
                                         <td>{{ $list['memberid'] }}</td>
+                                        <td>{{ $list['type'] }}</td>
                                         <td>{{ $list['tran_id'] }}</td>
-                                        <!--<td>{{ $list['type'] }}</td>-->
                                         {{-- <td>{{ $list['usdg_amount'] }} USDG</td> --}}
                                         <td>$ {{ number_format($list['amount'],2) }}</td>
                                         <td class="img">

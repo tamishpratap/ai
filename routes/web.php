@@ -6,6 +6,7 @@ use App\Http\Controllers\FundController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\LevelsController;
 use App\Http\Controllers\MemberDetailController;
+use App\Http\Controllers\TempController;
 use App\Http\Controllers\StakingController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\WithdrawalController;
@@ -37,6 +38,11 @@ Route::post('/retrivePassword', [AdminController::class, 'retrivePassword'])->na
 Route::group(['prefix' => 'admin', 'middleware' => 'AdminAuth'], function () {
 
   Route::get('/dashboard', [AdminController::class, 'dashboard']);
+  Route::get('/popup-image', [AdminController::class, 'popupImage'])->name('admin.popupImage');
+  Route::post('/popup-image/update', [AdminController::class, 'popupImageUpdate'])->name('admin.popupImageUpdate');
+  Route::get('/popup-image/toggle-status', [AdminController::class, 'popupImageToggleStatus'])->name('admin.popupImageToggleStatus');
+  Route::get('/popup-image/delete', [AdminController::class, 'popupImageDelete'])->name('admin.popupImageDelete');
+  Route::get('/achievers-images', [AdminController::class, 'popupImage']);
   Route::get('/profile', [AdminController::class, 'profile']);
   Route::get('/member-details', [AdminController::class, 'details']);
   //member account control update
@@ -48,6 +54,8 @@ Route::group(['prefix' => 'admin', 'middleware' => 'AdminAuth'], function () {
   //member details update
   Route::get('/members/member-update/{id}', [AdminController::class, 'memberUpdate']);
   Route::post('/updateDetails', [AdminController::class, 'updateDetails'])->name('updateDetails');
+  Route::get('/free-pin-account', [AdminController::class, 'freePinAccount']);
+  Route::post('/PinUserAccount', [AdminController::class, 'PinUserAccount'])->name('PinUserAccount');
 
   // dashboard message section
   Route::get('/dash-messages', [AdminController::class, 'dashMessages']);
@@ -67,19 +75,24 @@ Route::group(['prefix' => 'admin', 'middleware' => 'AdminAuth'], function () {
   Route::post('/sendWdlRequest', [WithdrawalController::class, 'sendWdlRequest'])->name('sendWdlRequest');
   Route::post('/withdrawal/accept/{id}', [AdminController::class, 'wAccept'])->name('withdrawal.accept');
   Route::post('/withdrawal/cancel/{id}', [AdminController::class, 'wCancel'])->name('withdrawal.cancel');
-
-  Route::get('/package-details', [AdminController::class, 'packageDetails']);
+  Route::get('/withdrawal-accept/{id}', [WithdrawalController::class, 'withdrawalaccept']);
+  Route::post('/sendWdlRequest', [WithdrawalController::class, 'sendWdlRequest'])->name('sendWdlRequest');
+//   Route::get('/package-details', [AdminController::class, 'packageDetails']);
   // Route::get('/new-withdrawal-request', [AdminController::class, 'withdrawals']);
   Route::get('/p2p-fund-transfer', [AdminController::class, 'p2pFundTransfer']);
   // Route::get('/payment-history', [AdminController::class, 'paymentHistory']);
 
 
-  // Income routes
+   // Income routes
   Route::get('/incomes/staking-details', [AdminController::class, 'stakingDetails']);
   Route::get('/incomes/staking-incomes', [AdminController::class, 'stakingIncomes']);
   Route::get('/incomes/level-incomes', [AdminController::class, 'levelIncomes']);
+  Route::get('/incomes/reward-incomes', [AdminController::class, 'rewardIncomes']);
+  Route::get('/incomes/direct-incomes', [AdminController::class, 'directIncomes']);
+  Route::get('/incomes/monthly-roi-incomes', [AdminController::class, 'monthlyRoiIncomes']);
   Route::get('/incomes/level-details', [AdminController::class, 'levelDetails']);
-
+  
+  
   //support ticket sections
   Route::get('/support/new-support-ticket', [SupportController::class, 'newSupport']);
   Route::get('/support/open-support-ticket', [SupportController::class, 'openSupport']);
@@ -96,15 +109,15 @@ Route::group(['prefix' => 'admin', 'middleware' => 'AdminAuth'], function () {
   Route::post('addMemFunds', [AdminController::class, 'addMemFunds'])->name('addMemFunds');
 
   // deposit details
-  Route::get('/deposit-details', [AdminController::class, 'depDetails']);
-  Route::get('/deposit-status/{id}', [AdminController::class, 'depositStatus']);
-  Route::post('/depositDataUSDT', [AdminController::class, 'depositDataUSDT'])->name('depositDataUSDT');
+//   Route::get('/deposit-details', [AdminController::class, 'depDetails']);
+//   Route::get('/deposit-status/{id}', [AdminController::class, 'depositStatus']);
+//   Route::post('/depositDataUSDT', [AdminController::class, 'depositDataUSDT'])->name('depositDataUSDT');
 
   Route::get('/funds/deduct-funds', [AdminController::class, 'deductFunds']);
   Route::post('deductMemFunds', [AdminController::class, 'deductMemFunds'])->name('deductMemFunds');
   Route::get('/funds/add-funds-details', [AdminController::class, 'addFundsDetails']);
   Route::get('/request-history', [AdminController::class, 'fundsHistory']);
-  Route::get('/fund-requests', [AdminController::class, 'fundRequests']);
+//   Route::get('/fund-requests', [AdminController::class, 'fundRequests']);
   Route::get('/funds/import-fund-history', [AdminController::class, 'requestsHistory']);
   Route::get('/accept-fundrequest/{id}', [FundController::class, 'acceptReq']);
   Route::get('/reject-fundrequest/{id}', [FundController::class, 'rejectReq']);
@@ -119,8 +132,8 @@ Route::group(['prefix' => 'admin', 'middleware' => 'AdminAuth'], function () {
   //set rates
   Route::get('/rate/set-rates', [AdminController::class, 'setRates']);
   Route::post('/rateUpdate', [AdminController::class, 'rateUpdate'])->name('rateUpdate');
-  Route::get('/mlm-settings', [AdminController::class, 'mlmSettings']);
-  Route::post('/mlm-settings', [AdminController::class, 'mlmSettingsUpdate'])->name('mlmSettingsUpdate');
+  // Route::get('/mlm-settings', [AdminController::class, 'mlmSettings']);
+  // Route::post('/mlm-settings', [AdminController::class, 'mlmSettingsUpdate'])->name('mlmSettingsUpdate');
   Route::get('/packages', [AdminController::class, 'packages']);
   Route::post('/packages/{id}/status', [AdminController::class, 'packageStatusChange'])->name('packageStatusChange');
 
@@ -179,11 +192,14 @@ Route::group(['prefix' => 'member', 'middleware' => 'MemberAuth'], function () {
   Route::get('/payment-cancel/{orderid}', [FundController::class, 'payCancel']);
   Route::get('/fund/import-fund-history', [FundController::class, 'impfundhis']);
 
-  //income route
+   //income route
   Route::get('/income/staking-details', [StakingController::class, 'stakingDetails']);
   Route::get('/income/staking-incomes', [StakingController::class, 'stakingIncomes']);
-  Route::get('/income/level-details', [IncomeController::class, 'levelDetails']);
+  Route::get('/income/reward-details', [IncomeController::class, 'rewardDetails']);
   Route::get('/income/level-incomes', [IncomeController::class, 'levelIncomes']);
+  Route::get('/income/reward-incomes', [IncomeController::class, 'rewardIncomes']);
+  Route::get('/income/direct-incomes', [IncomeController::class, 'directIncomes']);
+//   Route::get('/income/monthly-roi-incomes', [IncomeController::class, 'monthlyRoiIncomes']);
 
   // P2p Fund Transfer
   Route::get('/p2p-wallet', [FundController::class, 'p2pwallet']);
@@ -223,10 +239,11 @@ Route::group(['prefix' => 'member', 'middleware' => 'MemberAuth'], function () {
   Route::get('/levels/total-team-members', [LevelsController::class, 'totalTeamMembers']); //new route for
 
 
-  //   //wallet to p2p transfer
-  //   Route::get('/wallet/wallet-to-p2p', [FundController::class, 'walletToP2P']);
-  //   Route::get('/wallet/wallet-to-p2p-history', [FundController::class, 'walletP2Phistory']);
-  //   Route::post('walletP2pTransfer', [FundController::class, 'walletP2pTransfer'])->name('walletP2pTransfer');
+ //wallet to p2p transfer
+    Route::get('/wallet/wallet-to-p2p', [FundController::class, 'walletToP2P']);
+    Route::get('/wallet/wallet-to-p2p-history', [FundController::class, 'walletP2Phistory']);
+    Route::post('walletP2pTransfer', [FundController::class, 'walletP2pTransfer'])->name('walletP2pTransfer');
+
 
   //member support section
   Route::get('/support/create-ticket', [SupportController::class, 'createTick']);
@@ -246,3 +263,8 @@ Route::group(['prefix' => 'member', 'middleware' => 'MemberAuth'], function () {
 Route::fallback(function () {
   return view('member.error404');
 });
+
+
+// Route::get('/dailyIncomeDis', [TempController::class, 'dailyIncomeDis']);
+// Route::get('/levelIncomeDis', [TempController::class, 'levelIncomeDis']);
+// Route::get('/rewardGen', [TempController::class, 'rewardGen']);

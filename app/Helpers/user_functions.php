@@ -4,6 +4,7 @@ use App\Models\AddonBonusIncome;
 use App\Models\FundRequest;
 use App\Models\DirectIncome;
 use App\Models\IbIncome;
+use App\Models\RewardIncome;
 use App\Models\ImportFund;
 use App\Models\LevelIncome;
 use App\Models\MemberDetail;
@@ -16,7 +17,7 @@ use App\Models\WithdrawalRequest;
 
 function userId()
 {
-    $userid = "GAB" . rand(100000, 999999);
+    $userid = "QRB" . rand(100000, 999999);
     $member = MemberDetail::where('memberid', $userid)->count();
     if ($member > 0) {
         userId();
@@ -74,6 +75,16 @@ function updateUpline($sponsorid, $memberid)
     $var->upline_8 = optional($pool)->upline_7;
     $var->upline_9 = optional($pool)->upline_8;
     $var->upline_10 = optional($pool)->upline_9;
+    $var->upline_11 = optional($pool)->upline_10;
+    $var->upline_12 = optional($pool)->upline_11;
+    $var->upline_13 = optional($pool)->upline_12;
+    $var->upline_14 = optional($pool)->upline_13;
+    $var->upline_15 = optional($pool)->upline_14;
+    $var->upline_16 = optional($pool)->upline_15;
+    $var->upline_17 = optional($pool)->upline_16;
+    $var->upline_18 = optional($pool)->upline_17;
+    $var->upline_19 = optional($pool)->upline_18;
+    $var->upline_20 = optional($pool)->upline_19;
     $var->save();
 }
 
@@ -113,7 +124,7 @@ function totalDeposit($memberid)
 
 function totalIncome($memberid)
 {
-    $total = totalStakingIncome($memberid) + totalLevelIncome($memberid);
+    $total = totalStakingIncome($memberid) + totalLevelIncome($memberid) + totalRewardIncome($memberid) + totalDirectIncome($memberid);
     return $total;
 }
 
@@ -126,6 +137,18 @@ function totalStakingIncome($memberid)
 function totalLevelIncome($memberid)
 {
     $var = LevelIncome::where([['status', 'Paid'], ['memberid', $memberid]])->sum('amount');
+    return $var;
+}
+
+function totalRewardIncome($memberid)
+{
+    $var = RewardIncome::where([['status', 'Paid'], ['memberid', $memberid]])->sum('amount');
+    return $var;
+}
+
+function totalDirectIncome($memberid)
+{
+    $var = DirectIncome::where([['status', 'Paid'], ['memberid', $memberid]])->sum('amount');
     return $var;
 }
 

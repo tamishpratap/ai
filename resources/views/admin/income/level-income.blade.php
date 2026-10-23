@@ -34,6 +34,7 @@
 
         <div class="row">
             <div class="col-md-12">
+            @include('admin.partials.history-date-filter')
                 @if (session()->has('wMessage'))
                 <div class="alert alert-primary">{{session('wMessage')}}</div> 
                 @endif
@@ -45,13 +46,15 @@
                                 <thead>
                                     <tr>
                                         <th>{{ __('S.No')}}</th>
-                                        <th>{{ __('Date')}}</th>
+                                        <!--<th>{{ __('Date')}}</th>-->
                                         <th>{{ __('Memberid')}}</th>
-                                        <th>{{ __('Amount ')}}</th>
+                                        <th>{{ __('Staking Iincome')}}</th>
                                         <th>{{ __('Level')}}</th>
+                                        <th>{{ __('Downline ')}}</th>
                                         <th>{{ __('Level Id ')}}</th>
-                                        <th>{{ __('Withdrawal')}}</th>
-                                        <th>{{ __('Deduction')}}</th>
+                                        <th>{{ __('Name')}}</th>
+                                        <th>{{ __('Rate ')}}</th>
+                                        <th>{{ __('Amount ')}}</th>
                                         <th>{{ __('Status')}}</th>
                                     </tr>
                                 </thead>
@@ -60,13 +63,15 @@
                                     @foreach ($sdata as $list )
                                         <tr>
                                             <td>{{$i}}</td>
-                                            <td>{{date('d-m-Y', strtotime($list['created_at']))}}</td>
+                                            <!--<td>{{date('d-m-Y', strtotime($list['created_at']))}}</td>-->
                                             <td>{{$list['memberid']}}</td>
-                                            <td>$ {{$list['amount']}}</td>
+                                            <td>$ {{number_format($list['staking_income']/5, 2)}}</td>
                                             <td>{{$list['level']}}</td>
+                                            <td>{{$list['downline']}}</td>
                                             <td>{{$list['level_id']}}</td>
-                                            <td>$ {{number_format($list['package'], 2)}}</td>
-                                            <td>$ {{number_format($list['package']/5, 2)}}</td>
+                                            <td>{{$list['name']}}</td>
+                                            <td>{{$list['rate']}} %</td>
+                                            <td>$ {{number_format($list['amount'], 2)}}</td>
                                             
                                             <td>
                                                 @if ($list['status'] == 'Paid')
