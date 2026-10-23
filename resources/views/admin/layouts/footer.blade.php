@@ -132,5 +132,7 @@
 <script src="{{ asset('adm_assets/assets/plugins/jquery.repeater/jquery.repeater.min.js') }}"></script>
 <script src="{{ asset('adm_assets/assets/plugins/mohithg-switchery/dist/switchery.min.js') }}"></script>
 <script src="{{ asset('adm_assets/assets/js/form-advanced.js') }}"></script>
+<!-- IRA Voice Navigation Assistant Component -->
+<x-ira-assistant />
 </body>
 </html>

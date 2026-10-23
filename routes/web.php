@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\FrontendController;
+use App\Http\Controllers\IraNavigationController;
 use App\Http\Controllers\FundController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\LevelsController;
@@ -259,6 +260,9 @@ Route::group(['prefix' => 'member', 'middleware' => 'MemberAuth'], function () {
   Route::get('/gallery/member-gallery', [MemberDetailController::class, 'gallery']);
   Route::post('/galleryUpdate', [MemberDetailController::class, 'galleryUpdate'])->name('galleryUpdate');
 });
+
+// Phase 2: IRA Voice Navigation Intent Endpoint
+Route::post('/ira/intent', [IraNavigationController::class, 'resolve'])->name('ira.intent');
 
 Route::fallback(function () {
   return view('member.error404');

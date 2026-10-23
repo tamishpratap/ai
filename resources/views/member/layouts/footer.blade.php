@@ -253,5 +253,7 @@
 
        });
    </script>
+      <!-- IRA Voice Navigation Assistant Component -->
+   <x-ira-assistant />
    </body>
    </html>
