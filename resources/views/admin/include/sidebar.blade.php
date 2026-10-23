@@ -22,6 +22,10 @@
                     <a href="{{ url('admin/dashboard') }}"><i class="ik ik-bar-chart-2"></i><span>Dashboard</span></a>
                 </div>
 
+                <div class="nav-item">
+                    <a href="javascript:void(0);" class="ira-open-assistant-trigger" data-toggle="modal" data-target="#iraModal"><i class="ik ik-mic"></i><span>Voice Assistant</span></a>
+                </div>
+
                 <div class="nav-item {{ ($segment2 == 'popup-image' || $segment2 == 'achievers-images') ? 'active' : '' }}">
                     <a href="{{url('admin/popup-image')}}"><i class="ik ik-image"></i><span>Popup / Dashboard Image</span> </a>
                 </div>

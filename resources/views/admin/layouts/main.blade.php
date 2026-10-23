@@ -34,5 +34,7 @@
 
 	<!-- initiate scripts-->
 	@include('admin.include.script')	
+<!-- IRA Voice Navigation Assistant Component -->
+	<x-ira-assistant />
 </body>
 </html>

@@ -1,0 +1,193 @@
+{{-- Quantum ARB IRA Voice Navigation Assistant Component --}}
+@once
+<link rel="stylesheet" href="{{ asset('ira/ira-assistant.css') }}?v={{ file_exists(public_path('ira/ira-assistant.css')) ? filemtime(public_path('ira/ira-assistant.css')) : '1.0' }}">
+
+<!-- Floating Action Launcher Container -->
+<div id="iraFloatingContainer" class="ira-floating-container" role="region" aria-label="IRA Voice Navigation Controls">
+    <!-- Main Floating Voice Button: starts direct listening without opening modal -->
+    <button type="button" id="iraFloatingBtn" class="ira-floating-btn ready" aria-label="Speak with IRA Voice Assistant" title="Tap to speak with IRA" aria-live="polite">
+        <span class="ira-floating-pulse" aria-hidden="true"></span>
+        <svg class="ira-floating-icon" id="iraFloatingMicIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+        <span class="ira-floating-label" id="iraFloatingLabel">IRA Voice AI</span>
+    </button>
+
+    <!-- Dedicated Expand / Open Assistant Window Button -->
+    <button type="button" id="iraFloatingExpandBtn" class="ira-floating-expand-btn" aria-label="Open IRA Assistant Window and Speak" title="Open and Speak with IRA">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+    </button>
+</div>
+
+<!-- Right-Side Docked / Slide-Up IRA Assistant Panel -->
+<div class="modal fade ira-side-panel" id="iraModal" tabindex="-1" aria-labelledby="iraModalTitle" aria-hidden="true" data-bs-backdrop="false" data-backdrop="false">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content ira-modal-card" id="iraModalCard">
+            <!-- Modal Header -->
+            <div class="ira-modal-header d-flex justify-content-between align-items-center">
+                <div class="ira-header-brand d-flex align-items-center gap-2 min-w-0">
+                    <div class="ira-avatar-badge" aria-hidden="true">
+                        IRA
+                    </div>
+                    <div class="ira-brand-info min-w-0">
+                        <div class="ira-title-row d-flex align-items-center gap-2 min-w-0">
+                            <h6 class="modal-title fw-bold mb-0 text-dark ira-title" id="iraModalTitle">IRA Assistant</h6>
+                            <span id="iraContextBadge" class="ira-context-badge">
+                                {{ (session()->has('ADMIN_ID') || session()->get('ADMIN_LOGIN') === true) ? 'Admin' : ((session()->has('MEMBER_ID') || session()->get('MEMBER_LOGIN') === true) ? 'Member' : 'Public') }}
+                            </span>
+                        </div>
+                        <small class="text-muted ira-header-subtitle">Quantum ARB Voice AI</small>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 ira-header-controls flex-shrink-0">
+                    <select class="ira-lang-select" id="iraLangSelect" title="Select Voice Recognition Language">
+                        <option value="hi-IN" selected>Hindi / Hinglish</option>
+                        <option value="en-IN">English (IN)</option>
+                        <option value="en-US">English (US)</option>
+                    </select>
+
+                    <span class="ira-status-pill ready" id="iraStatusPill" title="Voice Status">
+                        <span class="ira-status-dot"></span>
+                        <span id="iraStatusLabel">Ready</span>
+                    </span>
+
+                    <div class="ira-header-buttons d-inline-flex align-items-center gap-1">
+                        <button type="button" class="ira-expand-btn btn btn-sm p-0 text-decoration-none" id="iraExpandBtn" title="Toggle Full-Screen Mode" aria-label="Toggle Full-Screen Mode">
+                            <svg id="iraExpandSvg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                            </svg>
+                            <svg id="iraCollapseSvg" class="d-none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 10H4m6 0V4m0 6L3 3m11 7h6m-6 0V4m0 6l7-7"/>
+                            </svg>
+                        </button>
+
+                        <button type="button" class="ira-close-btn btn btn-sm p-0 text-decoration-none" id="iraCloseBtn" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Close IRA Assistant" title="Close Assistant (Esc)">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body px-4 py-3 d-flex flex-column" style="gap: 0.85rem;">
+                <!-- Heading -->
+                <div class="text-center">
+                    <h5 class="fw-bold mb-1 text-dark" id="iraMainHeading">Tap to Speak</h5>
+                    <p class="text-muted small mb-0" id="iraSubHeading">
+                        Say &ldquo;Dashboard kholo&rdquo;, &ldquo;Open Staking&rdquo;, or &ldquo;Show Wallet&rdquo;
+                    </p>
+                </div>
+
+                <!-- Interactive Orb Stage -->
+                <div class="ira-orb-wrapper" id="iraOrbWrapper">
+                    <div class="ira-ripple-ring ring-1"></div>
+                    <div class="ira-ripple-ring ring-2"></div>
+                    <div class="ira-ripple-ring ring-3"></div>
+
+                    <button type="button" id="iraOrbBtn" class="ira-orb-btn ready" title="Tap to start or interrupt microphone" aria-label="Microphone control button">
+                        <svg id="iraOrbIcon" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Animated Waveform Visualizer -->
+                <div class="ira-visualizer" id="iraWaveVisualizer" aria-hidden="true">
+                    <span class="ira-wave-bar"></span>
+                    <span class="ira-wave-bar"></span>
+                    <span class="ira-wave-bar"></span>
+                    <span class="ira-wave-bar"></span>
+                    <span class="ira-wave-bar"></span>
+                    <span class="ira-wave-bar"></span>
+                    <span class="ira-wave-bar"></span>
+                </div>
+
+                <!-- Conversation Stream (Separated User & IRA Bubbles) -->
+                <div class="ira-transcript-card" id="iraTranscriptArea">
+                    <div class="ira-transcript-header">
+                        <span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="me-1 text-primary" style="vertical-align: -2px;" aria-hidden="true">
+                                <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+                            </svg>
+                            Live Voice Conversation
+                        </span>
+                        <span class="badge bg-white text-muted border" style="font-size: 0.68rem;">Continuous AI Navigation</span>
+                    </div>
+
+                    <!-- User Message Bubble (Right-aligned, primary blue) -->
+                    <div id="iraTranscriptUser" class="ira-bubble-row user d-none">
+                        <div class="ira-user-bubble">
+                            <span id="iraUserText"></span>
+                        </div>
+                    </div>
+
+                    <!-- IRA Message Bubble (Left-aligned, clean card) -->
+                    <div id="iraTranscriptAi" class="ira-bubble-row ai">
+                        <div class="ira-ai-avatar" aria-hidden="true">IRA</div>
+                        <div class="ira-ai-bubble">
+                            <span id="iraAiText">&ldquo;Hello {{ session('name') ?: (session('ADMIN_EMAIL') ?: 'there') }}. I am IRA, your voice navigation assistant. Tap the microphone orb to speak.&rdquo;</span>
+                        </div>
+                    </div>
+
+                    <!-- Structured Clarification / Status Container -->
+                    <div id="iraCardContainer" class="mt-2 d-none"></div>
+                </div>
+
+                <!-- Action / Notification Banner -->
+                <div id="iraActionBanner" class="alert alert-success py-2 px-3 small d-none mb-0 d-flex align-items-center justify-content-between text-start">
+                    <div>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" class="me-1 text-success" style="vertical-align: -2px;" aria-hidden="true">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        <span id="iraActionBannerText"></span>
+                    </div>
+                </div>
+
+                <!-- Bottom Voice Control Bar (Voice-Only: No Manual Text Typing) -->
+                <div class="ira-bottom-bar pt-2 border-top d-flex align-items-center justify-content-between">
+                    <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 ira-stop-btn" id="iraStopBtn" title="Stop listening and speaking">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px;" aria-hidden="true">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-8h2v8zm4 0h-2v-8h2v8z"/>
+                        </svg>
+                        <span>Stop Voice</span>
+                    </button>
+                    <small class="text-muted" style="font-size: 0.72rem;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="me-1" style="vertical-align: -1px;" aria-hidden="true">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                        </svg>
+                        Voice-only input enabled
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+window.IRA_CONFIG = {
+    csrfToken: "{{ csrf_token() }}",
+    intentEndpoint: "{{ route('ira.intent') }}",
+    currentPage: window.location.pathname,
+    role: "{{ (session()->has('ADMIN_ID') || session()->get('ADMIN_LOGIN') === true) ? 'admin' : ((session()->has('MEMBER_ID') || session()->get('MEMBER_LOGIN') === true) ? 'member' : 'guest') }}",
+    userName: "{{ session('name') ?: (session('ADMIN_EMAIL') ?: 'User') }}",
+    isAuthenticated: {{ (session()->has('ADMIN_ID') || session()->get('ADMIN_LOGIN') === true || session()->has('MEMBER_ID') || session()->get('MEMBER_LOGIN') === true) ? 'true' : 'false' }},
+    defaultLocale: "hi-IN",
+    preferredVoice: "{{ config('gemini.voice', 'Kore') }}",
+    voiceRate: 1.0,
+    voicePitch: 1.05
+};
+</script>
+<script src="{{ asset('ira/ira-assistant.js') }}?v={{ file_exists(public_path('ira/ira-assistant.js')) ? filemtime(public_path('ira/ira-assistant.js')) : '1.0' }}" defer></script>
+@endonce
