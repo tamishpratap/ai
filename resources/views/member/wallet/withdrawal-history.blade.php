@@ -74,8 +74,8 @@
                                             <th scope="col">Request Date</th>
                                             <th scope="col">Request Id</th>
                                             <th scope="col">Wallet Address</th>
-                                            <th scope="col">Comment</th>
-                                            <th scope="col">Type</th>
+                                            <!--<th scope="col">Comment</th>-->
+                                            <!--<th scope="col">Type</th>-->
                                             <th scope="col">Gross Amount</th>
                                             <th scope="col">Service</th>
                                             <th scope="col">Net Amount</th>
@@ -97,8 +97,8 @@
                                                 </td>
                                                 <td>{{ $op_data['request_id'] }}</td>
                                                 <td>{{ $op_data['wallet_address'] }}</td>
-                                                <td>{{ $op_data['admin_comment'] ?? '--' }}</td>
-                                                 <td> {{ $op_data['type'] }} </td>
+                                                <!--<td>{{ $op_data['admin_comment'] ?? '--' }}</td>-->
+                                                 <!--<td> {{ $op_data['type'] }} </td>-->
                                                 <td>$ {{ number_format($op_data['gross_amount'],2) }} </td>
                                                <td>$ {{ number_format($op_data['service_charge'],2) }} </td>
                                                 <td>$ {{ number_format($op_data['net_amount'],2) }} </td>

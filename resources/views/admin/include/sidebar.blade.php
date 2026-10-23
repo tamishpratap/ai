@@ -22,29 +22,28 @@
                     <a href="{{ url('admin/dashboard') }}"><i class="ik ik-bar-chart-2"></i><span>Dashboard</span></a>
                 </div>
 
-                {{-- <div class="nav-item {{ ($segment1 == 'rest-api') ? 'active' : '' }}">
-                    <a href="{{url('admin/achievers-images')}}"><i class="ik ik-image"></i><span>Achievers Images</span> </a>
-                </div> --}}
-                <div class="nav-item {{ $segment1 == 'rest-api' ? 'active' : '' }}">
-                    <a href="{{ url('admin/dash-messages') }}"><i class="ik ik-image"></i><span>Dashboard
-                            Messages</span> </a>
+                <div class="nav-item {{ ($segment2 == 'popup-image' || $segment2 == 'achievers-images') ? 'active' : '' }}">
+                    <a href="{{url('admin/popup-image')}}"><i class="ik ik-image"></i><span>Popup / Dashboard Image</span> </a>
                 </div>
-                <div class="nav-item {{ $segment1 == 'rest-api' ? 'active' : '' }}">
-                    <a href="{{ url('admin/rate/set-rates') }}"><i class="ik ik-bar-chart"></i><span>Set Rates</span>
-                    </a>
+                <div class="nav-item {{ $segment2 == 'dash-messages' ? 'active' : '' }}">
+                    <a href="{{ url('admin/dash-messages') }}"><i class="ik ik-message-square"></i><span>Dashboard Messages</span> </a>
                 </div>
-                <div class="nav-item {{ $segment2 == 'mlm-settings' ? 'active' : '' }}">
+                <!--<div class="nav-item {{ $segment1 == 'rest-api' ? 'active' : '' }}">-->
+                <!--    <a href="{{ url('admin/rate/set-rates') }}"><i class="ik ik-bar-chart"></i><span>Set Rates</span>-->
+                <!--    </a>-->
+                <!--</div>-->
+                {{-- <div class="nav-item {{ $segment2 == 'mlm-settings' ? 'active' : '' }}">
                     <a href="{{ url('admin/mlm-settings') }}"><i class="ik ik-settings"></i><span>MLM Settings</span>
                     </a>
-                </div>
-                <div class="nav-item {{ $segment2 == 'packages' ? 'active' : '' }}">
-                    <a href="{{ url('admin/packages') }}"><i class="ik ik-box"></i><span>Packages</span>
-                    </a>
-                </div>
-                <div class="nav-item {{ $segment1 == 'rest-api' ? 'active' : '' }}">
-                    <a href="{{ url('admin/deposit-details') }}"><i class="ik ik-box"></i><span>Deposit Details</span>
-                    </a>
-                </div>
+                </div> --}}
+                <!--<div class="nav-item {{ $segment2 == 'packages' ? 'active' : '' }}">-->
+                <!--    <a href="{{ url('admin/packages') }}"><i class="ik ik-box"></i><span>Packages</span>-->
+                <!--    </a>-->
+                <!--</div>-->
+                <!--<div class="nav-item {{ $segment1 == 'rest-api' ? 'active' : '' }}">-->
+                <!--    <a href="{{ url('admin/deposit-details') }}"><i class="ik ik-box"></i><span>Deposit Details</span>-->
+                <!--    </a>-->
+                <!--</div>-->
                 <!--<div class="nav-item {{ $segment1 == 'rest-api' ? 'active' : '' }}">-->
                 <!--    <a href="{{ url('admin/member-gallery') }}"><i class="ik ik-bar-chart"></i><span>Member-->
                 <!--            Gallery</span>-->
@@ -62,11 +61,11 @@
                             class="menu-item {{ $segment1 == 'alerts' ? 'active' : '' }}">{{ __('Account Control') }}</a>
                         <a href="{{ url('admin/member-security') }}"
                             class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Members Security') }}</a> 
-                        <!--<a href="{{ url('admin/free-pin-account') }}"-->
-                        <!--    class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Temp Members') }}</a>-->
+                        <a href="{{ url('admin/free-pin-account') }}"
+                            class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Zero Pin Members') }}</a>
                         <a href="{{ url('admin/wallet-address') }}"
                             class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Member Wallet Address') }}</a>
-                        <a href="{{url('admin/package-details')}}" class="menu-item {{ ($segment1 == 'badges') ? 'active' : '' }}">{{ __('Package Details')}}</a>
+                        <!--<a href="{{url('admin/package-details')}}" class="menu-item {{ ($segment1 == 'badges') ? 'active' : '' }}">{{ __('Package Details')}}</a>-->
                     </div>
                 </div>
                 <div
@@ -79,10 +78,10 @@
                             class="menu-item {{ $segment1 == 'alerts' ? 'active' : '' }}">{{ __('Deduct Funds') }}</a>
                         <a href="{{ url('admin/funds/add-funds-details') }}"
                             class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Funds Details') }}</a>
-                        <a href="{{ url('admin/fund-requests') }}"
-                            class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Fund Requests') }}</a>
+                        <!--<a href="{{ url('admin/fund-requests') }}"-->
+                        <!--    class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Funds Requests') }}</a>-->
                         <a href="{{ url('admin/request-history') }}"
-                            class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Request History') }}</a>
+                            class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Import Fund History') }}</a>
                     </div>
                 </div>
 
@@ -90,10 +89,10 @@
                     class="nav-item {{ $segment1 == 'alerts' || $segment1 == 'buttons' || $segment1 == 'badges' || $segment1 == 'navigation' ? 'active open' : '' }} has-sub">
                     <a href="#"><i class="ik ik-tag"></i><span>{{ __('Staking Section') }}</span></a>
                     <div class="submenu-content">
-                        <a href="{{ url('admin/incomes/staking-details') }}"
-                            class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Staking Details') }}</a>
                         <a href="{{ url('admin/incomes/staking-incomes') }}"
                             class="menu-item {{ $segment1 == 'alerts' ? 'active' : '' }}">{{ __('Staking Income') }}</a>  
+                        <a href="{{ url('admin/incomes/staking-details') }}"
+                            class="menu-item {{ $segment1 == 'alerts' ? 'active' : '' }}">{{ __('Staking Details') }}</a>
                     </div>
                 </div> 
 
@@ -105,6 +104,12 @@
                         <!--    class="menu-item {{ $segment1 == 'badges' ? 'active' : '' }}">{{ __('Level Details') }}</a>  -->
                         <a href="{{ url('admin/incomes/level-incomes') }}"
                             class="menu-item {{ $segment1 == 'alerts' ? 'active' : '' }}">{{ __('Level Incomes') }}</a>
+                        <a href="{{ url('admin/incomes/reward-incomes') }}"
+                            class="menu-item {{ $segment1 == 'alerts' ? 'active' : '' }}">{{ __('Reward Income') }}</a>
+                        <a href="{{ url('admin/incomes/direct-incomes') }}"
+                            class="menu-item {{ $segment1 == 'alerts' ? 'active' : '' }}">{{ __('Direct Income') }}</a>
+                        <!--<a href="{{ url('admin/incomes/monthly-roi-incomes') }}"-->
+                        <!--    class="menu-item {{ $segment1 == 'alerts' ? 'active' : '' }}">{{ __('Monthly ROI Income') }}</a>-->
                     </div>
                 </div>
                 <div

@@ -6,6 +6,7 @@ use App\Models\ImportFund;
 use App\Models\DirectIncome;
 use App\Models\IbIncome;
 use App\Models\LevelIncome;
+use App\Models\RewardIncome;
 use App\Models\SpecialTradingBonus;
 use App\Models\StakingDetail;
 use App\Models\StakingIncome;
@@ -103,10 +104,9 @@ function totalinFundWallet()
 
 function totalInc()
 {
-    $total = totalLevelInc() + totalStakingInc();
+    $total = totalLevelInc() + totalStakingInc() + totalRewardInc() + totalDirectInc();
     return $total;
 }
-
 function totalLevelInc()
 {
     $var = LevelIncome::where('status', 'Paid')->sum('amount');
@@ -118,6 +118,21 @@ function totalStakingInc()
     $var = StakingIncome::where('status', 'Paid')->sum('amount');
     return $var;
 }
+
+
+function totalRewardInc()
+{
+    $var = RewardIncome::where('status', 'Paid')->sum('amount');
+    return $var;
+}
+
+
+function totalDirectInc()
+{
+    $var = DirectIncome::where('status', 'Paid')->sum('amount');
+    return $var;
+}
+
 
 function totalgrossAmount()
 {

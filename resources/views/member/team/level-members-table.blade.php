@@ -85,39 +85,24 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
-                                            <td>1</td>
-                                            <td>{{ __('1st Level') }}</td>
-                                            <td>
-                                                <div class="btn btn-pill bg-success ">
-                                                    {{ totalsingleLevel($data['memberid'], '1') }}</div>
-                                            </td>
-                                            <td><a class="btn btn-primary"
-                                                    href="{{ url('member/levels/level-members-details') }}/{{ '1' }}">View</a>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>2</td>
-                                            <td>{{ __('2nd Level') }}</td>
-                                            <td>
-                                                <div class="btn btn-pill bg-success ">
-                                                    {{ totalsingleLevel($data['memberid'], '2') }}</div>
-                                            </td>
-                                            <td><a class="btn btn-primary"
-                                                    href="{{ url('member/levels/level-members-details') }}/{{ '2' }}">View</a>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>3</td>
-                                            <td>{{ __('3rd Level') }}</td>
-                                            <td>
-                                                <div class="btn btn-pill bg-success ">
-                                                    {{ totalsingleLevel($data['memberid'], '3') }}</div>
-                                            </td>
-                                            <td><a class="btn btn-primary"
-                                                    href="{{ url('member/levels/level-members-details') }}/{{ '3' }}">View</a>
-                                            </td>
-                                        </tr>
+                                        @for ($level = 1; $level <= 20; $level++)
+                                            @php
+                                                $ends = ['th', 'st', 'nd', 'rd', 'th', 'th', 'th', 'th', 'th', 'th'];
+                                                $suffix = ((($level % 100) >= 11) && (($level % 100) <= 13)) ? 'th' : $ends[$level % 10];
+                                                $levelTitle = $level . $suffix . ' Level';
+                                            @endphp
+                                            <tr>
+                                                <td>{{ $level }}</td>
+                                                <td>{{ __($levelTitle) }}</td>
+                                                <td>
+                                                    <div class="btn btn-pill bg-success ">
+                                                        {{ totalsingleLevel($data['memberid'], (string)$level) }}</div>
+                                                </td>
+                                                <td><a class="btn btn-primary"
+                                                        href="{{ url('member/levels/level-members-details') }}/{{ $level }}">View</a>
+                                                </td>
+                                            </tr>
+                                        @endfor
                                     </tbody>
                                 </table>
                             </div>

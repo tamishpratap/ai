@@ -2,8 +2,8 @@
 @section('title', 'Staking Creation')
 @section('container')
     <!--**********************************
-                                                    Content body start
-                                                ***********************************-->
+                                                                                    Content body start
+                                                                                ***********************************-->
     <!-- Start::app-content -->
     <div class="main-content app-content">
         <div class="container-fluid">
@@ -44,7 +44,7 @@
                         <div class="card-header">
                             <h6 class="title">Create Investment Form</h6>
                         </div>
-                        <form action="{{ route('createStaking') }}" method="post">
+                        <form action="{{ route('createStaking') }}" method="post" id="stakingForm">
                             @csrf
                             <div class="card-body mb-5 pb-4">
                                 <div class="col-sm-12 mb-3">
@@ -57,14 +57,33 @@
                                 </div>
                                 <div class="col-sm-12 mb-3">
                                     <label class="form-label">Investment Package</label>
-                                    <select class="form-select" id="stak_package" name="stak_package">
+
+                                    <select class="form-select" id="stak_package" name="stak_package" required>
                                         <option value="">Select Package</option>
-                                        @foreach ($packages as $package)
-                                            <option value="{{ (int) $package->amount }}">{{ $package->name }} (${{ number_format($package->amount, 0) }})</option>
-                                        @endforeach
+                                        <option value="Silver">Silver ($100 - $1,000)</option>
+                                        <option value="Gold">Gold ($1,100 - $5,000)</option>
+                                        <option value="Platinum">Platinum ($5,100 - $10,000)</option>
+                                        <option value="Diamond">Diamond ($10,100+)</option>
                                     </select>
+
                                     @error('stak_package')
-                                        <span class="text-danger"> {{ $message }}</span>
+                                        <span style="color:red">{{ $message }}</span>
+                                    @enderror
+                                </div>
+
+                                <div class="col-sm-12 mb-3">
+                                    <label class="form-label">Investment Amount</label>
+
+                                    <input type="number" class="form-control" name="amount" id="amount"
+                                        value="{{ old('amount') }}" step="1" placeholder="Enter Investment Amount" required
+                                        >
+
+                                    <small id="amount_limit" class="text-warning d-block mt-2"></small>
+
+                                    <small id="amount_error" class="d-block mt-1" style="color:red"></small>
+
+                                    @error('amount')
+                                        <span style="color:red">{{ $message }}</span>
                                     @enderror
                                 </div>
                                 <div class="col-sm-12 mb-3">
@@ -88,12 +107,12 @@
                                             name="txn_password" required>
                                     </div>
                                     @error('txn_password')
-                                        <span class="text-danger"> {{ $message }}</span>
+                                        <span style="color:red"> {{ $message }}</span>
                                     @enderror
                                 </div>
                                 <div class="col-sm-12 m-b30 mt-3">
                                     <input type="hidden" class="form-control" value="{{ csrf_token() }}" id="csrf">
-                                    <button class="btn btn-primary float-end" id="act_btn">Create Investment</button>
+                                    <button type="submit" class="btn btn-primary float-end" id="act_btn">Create Investment</button>
                                 </div>
                             </div>
                         </form>
@@ -102,5 +121,154 @@
             </div>
         </div>
     </div>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
+    <script>
+        $(document).ready(function() {
+
+            function setPackageLimit() {
+
+                var packageName = $('#stak_package').val();
+
+                var minAmount = '';
+                var maxAmount = '';
+                var limitText = '';
+
+                if (packageName == 'Silver') {
+
+                    minAmount = 100;
+                    maxAmount = 1000;
+
+                    limitText = 'Minimum Amount: $100 | Maximum Amount: $1,000';
+
+                } else if (packageName == 'Gold') {
+
+                    minAmount = 1100;
+                    maxAmount = 5000;
+
+                    limitText = 'Minimum Amount: $1,100 | Maximum Amount: $5,000';
+
+                } else if (packageName == 'Platinum') {
+
+                    minAmount = 5100;
+                    maxAmount = 10000;
+
+                    limitText = 'Minimum Amount: $5,100 | Maximum Amount: $10,000';
+
+                } else if (packageName == 'Diamond') {
+
+                    minAmount = 10100;
+                    maxAmount = '';
+
+                    limitText = 'Minimum Amount: $10,100 | No Maximum Limit';
+
+                }
+
+                $('#amount').attr('min', minAmount);
+
+                if (maxAmount != '') {
+                    $('#amount').attr('max', maxAmount);
+                } else {
+                    $('#amount').removeAttr('max');
+                }
+
+                $('#amount_limit').text(limitText);
+
+                $('#amount').val('');
+                $('#amount_error').text('');
+            }
+
+
+            $('#stak_package').change(function() {
+                setPackageLimit();
+            });
+
+
+            $('#amount').on('input', function() {
+
+                var packageName = $('#stak_package').val();
+                var amount = parseFloat($(this).val());
+
+                var minAmount = 0;
+                var maxAmount = 0;
+
+                $('#amount_error').text('');
+
+                if (packageName == '') {
+                    $('#amount_error').text('Please select an investment package first.');
+                    return;
+                }
+
+                if (packageName == 'Silver') {
+
+                    minAmount = 100;
+                    maxAmount = 1000;
+
+                } else if (packageName == 'Gold') {
+
+                    minAmount = 1100;
+                    maxAmount = 5000;
+
+                } else if (packageName == 'Platinum') {
+
+                    minAmount = 5100;
+                    maxAmount = 10000;
+
+                } else if (packageName == 'Diamond') {
+
+                    minAmount = 10100;
+                    maxAmount = null;
+                }
+
+
+                if (isNaN(amount)) {
+                    return;
+                }
+
+
+                if (amount < minAmount) {
+
+                    if (maxAmount != null) {
+                        $('#amount_error').text(
+                            packageName + ' package amount must be between $' +
+                            minAmount.toLocaleString() + ' and $' +
+                            maxAmount.toLocaleString()
+                        );
+                    } else {
+                        $('#amount_error').text(
+                            packageName + ' package minimum amount is $' +
+                            minAmount.toLocaleString()
+                        );
+                    }
+
+                } else if (maxAmount != null && amount > maxAmount) {
+
+                    $('#amount_error').text(
+                        packageName + ' package amount must be between $' +
+                        minAmount.toLocaleString() + ' and $' +
+                        maxAmount.toLocaleString()
+                    );
+
+                } else {
+
+                    $('#amount_error').text('');
+                }
+
+            });
+
+            var isSubmitting = false;
+            $('#stakingForm').on('submit', function(e) {
+                if (isSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                isSubmitting = true;
+                var $btn = $('#act_btn');
+                $btn.prop('disabled', true);
+                $btn.html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Please wait...');
+            });
+
+        });
+    </script>
 @endsection

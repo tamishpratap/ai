@@ -1,10 +1,11 @@
 <?php
 
 namespace App\Console\Commands;
-
-use App\Models\LevelIncome;
-use App\Models\MemberDetail;
 use App\Models\StakingDetail;
+use App\Models\StakingIncome;
+use App\Models\MemberDetail;
+use App\Models\LevelIncome;
+
 use Illuminate\Console\Command;
 
 class LevelIncomeDis extends Command
@@ -28,69 +29,65 @@ class LevelIncomeDis extends Command
      */
     public function handle()
     {
-        $incomes = StakingDetail::where('status', 'Active')->get();
+        $incomes = StakingIncome::where([['status', 'Paid'], ['level_status', 0]])->whereDate('created_at', date('Y-m-d'))->get();
         foreach ($incomes as $value) {
-            $memberid = $value->memberid;
-            $invest_amount = $value->invest_amount;
-            $referral_installments = $value->referral_installments + 1;
-            
-            $memUpdate = MemberDetail::where('memberid', $memberid)->first();
-            if (!$memUpdate || $memUpdate->status != 'Active') {
-                continue;
-            }
-
+            $memberid = $value['memberid'];
+            $name = getName($memberid);
+            $share = $value['amount'];
             $sponsorid = getSponsorid($memberid);
-            $limit = 4;
-            if($referral_installments <= 50){
-                for ($i = 1; $i < $limit; $i++) {
-                    $level = $i;
+            $limit = 21;
+            for ($i = 1; $i < $limit; $i++) {
+                $level = $i;
+                $rate = levelRate($level);
+                $stak_amount = $share * $rate / 100;
+
+                if ($sponsorid != 'Root') {
+                    $var = MemberDetail::where('memberid', $sponsorid)->first();
+                    $status = $var->status;
+                    $downline = $var->downline;
                     
-                    $amount = levelamount($level, $invest_amount);
-                    if ($amount === null || $amount <= 0) {
-                        break;
-                    }
-    
-                    if ($sponsorid != 'Root' && $referral_installments <= 50) {
-                        $var = MemberDetail::where('memberid', $sponsorid)->first();
-                        if (!$var) {
-                            break;
-                        }
-                        
-                        $status = $var->status;
-                        $name = $var->name;
-                        $downline = $var->downline;
-    
-                        if ($status == 'Active') {
-                            if ($amount > 0) {
-                                $insert = new LevelIncome();
-                                $insert->memberid = $sponsorid;
-                                $insert->level = $level;
-                                $insert->level_id = $memberid;
-                                $insert->amount = $amount;
-                                $insert->package = $invest_amount;
-                                $insert->name = $name;
-                                $insert->downline = $downline;
-                                // $insert->type = 'Level Income';
-                                $insert->status = 'Paid';
-                                $insert->save();
-                                
-                                $wallet = $var->wallet;
-                                $var->wallet += $amount;
-                                $var->save();
-                
-                                walletTransfer($sponsorid, $amount, 'debit', $wallet, 'Direct Income', 'Direct Income amount has been transfered into Main Wallet.');
-                            }
-                        }
-    
-                        $sponsorid = $var->sponsorid;
+                    $capping = capping($sponsorid);
+                    $achieved = Income3xachieved($sponsorid);
+                    $balance = $capping - $achieved;
+                    if ($balance <= $stak_amount) {
+                        $amount = $balance;
                     } else {
-                        break;
+                        $amount = $stak_amount;
                     }
+
+                    if ($amount > 0 && $status == 'Active') {
+
+                        $insert = new LevelIncome();
+                        $insert->memberid = $sponsorid;
+                        $insert->level = $level;
+                        $insert->rate = $rate;
+                        $insert->level_id = $memberid;
+                        $insert->amount = $amount;
+                        $insert->downline = $downline;
+                        $insert->staking_income = $share;
+                        $insert->name = $name;
+                        $insert->type = 'Staking';
+
+                        if ($level == 1 && $downline >= 1 || $level == 2 && $downline >= 2 || $level == 3 && $downline >= 3 || $level == 4 && $downline >= 4 || $level == 5 && $downline >= 5 || $level == 6 && $downline >= 6 || $level == 7 && $downline >= 7 || $level == 8 && $downline >= 8 || $level == 9 && $downline >= 9 || $level == 10 && $downline >= 10 || $level == 11 && $downline >= 11 || $level == 12 && $downline >= 12 || $level == 13 && $downline >= 13 || $level == 14 && $downline >= 14 || $level == 15 && $downline >= 15 || $level == 16 && $downline >= 16 || $level == 17 && $downline >= 17 || $level == 17 && $downline >= 18 || $level == 19 && $downline >= 19 || $level == 20 && $downline >= 20) {
+
+                            $insert->status = 'Paid';
+                            $insert->save();
+                            
+                            $wallet = $var->wallet;
+                            $var->wallet += $amount;
+                            $var->save();
+
+                            walletTransfer($sponsorid, $amount, 'debit', $wallet, 'Level Income', '' . $i . ' Level Income Amount Added into wallet.');
+                        } else {
+                            $insert->status = 'Flushed';
+                            $insert->save();
+                        }
+                    }
+
+                    $sponsorid = $var['sponsorid'];
                 }
-                
-                $value->referral_installments = $referral_installments;
-                $value->save();
             }
+            $update = StakingIncome::where('id', $value->id)->update(['level_status' => 1]);
         }
     }
 }
