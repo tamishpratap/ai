@@ -6,6 +6,8 @@ use App\Models\ImportFund;
 use App\Models\MemberDetail;
 use App\Models\IbIncome;
 use App\Models\RankIncome;
+use App\Models\LevelIncome;
+use App\Models\RewardIncome;
 use App\Models\StakingDetail;
 use App\Models\StakingIncome;
 use App\Models\WalletTransfer;
@@ -74,20 +76,13 @@ function capping($memberid)
     $downline = $var->downline;
 
     if ($downline >= 1) {
-        $cap = $var['self_biz'] * 3;
+        $cap = $var['self_biz'] * 5;
     } else {
-        $cap = $var['self_biz'] * 2;
+        $cap = $var['self_biz'] * 3;
     }
 
     return $cap;
 }
-
-// function stakingCapping($memberid, $staking_id)
-// {
-//     $sum = StakingDetail::where([['memberid', $memberid], ['id','<=', $staking_id]])->sum('invest_amount');
-//     $cap = $sum * 3;
-//     return $cap;
-// }
 
 function stakingCapping($memberid, $staking_id)
 {
@@ -96,9 +91,9 @@ function stakingCapping($memberid, $staking_id)
     $downline = $var->downline;
 
     if ($downline >= 1) {
-        $cap = $sum * 3;
+        $cap = $sum * 5;
     } else {
-        $cap = $sum * 2;
+        $cap = $sum * 3;
     }
     return $cap;
 }
@@ -110,11 +105,10 @@ function Income3xachieved($memberid)
         $date = $var['activated_at'];
         $direct = DirectIncome::where([['status', 'Paid'], ['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');
         $staking = StakingIncome::where([['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');
-        $addon = AddonBonusIncome::where([['status', 'Paid'], ['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');
-        $special = SpecialTradingBonus::where([['status', 'Paid'], ['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');
-        $ib = IbIncome::where([['status', 'Paid'], ['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');
+        $level = LevelIncome::where([['status', 'Paid'], ['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');
+        $reward = RewardIncome::where([['status', 'Paid'], ['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');
         
-        $totalAmount = $direct + $addon + $staking + $special + $ib;
+        $totalAmount = $direct + $level + $staking + $reward;
     } else {
         $totalAmount = 0;
     }
@@ -131,7 +125,7 @@ function directIncome($sponsorid, $memberid, $name, $package, $type)
         $status = $var->status;
         $sponsor_package = $var->package;
 
-        $direct_amount = $package / 100 * 10;
+        $direct_amount = $package / 100 * 5;
 
         if ($status == 'Active') {
             $capping = capping($sponsorid);
@@ -165,20 +159,24 @@ function directIncome($sponsorid, $memberid, $name, $package, $type)
     }
 }
 
-function levelamount($level, $package)
+function levelRate($level)
 {
 
     if ($level == 1) {
-        $amount = $package / 100 * 0.5;
+        $rate = 15;
     } elseif ($level == 2) {
-        $amount = $package / 100 * 0.25;
-    } elseif ($level == 3) {
-        $amount = $package / 100 * 0.25;
-    } else {
-        $amount = 0;
+        $rate = 10;
+    } elseif ($level >= 3 && $level <= 5) {
+        $rate = 5;
+    } elseif ($level >= 6 && $level <= 10) {
+        $rate = 3;
+    } else if ($level >= 11 && $level <= 20) {
+        $rate = 2;
+    }else {
+        $rate = 0;
     }
 
-    return $amount;
+    return $rate;
 }
 
 function getteamMember($userid, $memberid)
@@ -370,4 +368,42 @@ function insertSpecialTradingBonus($sponsorid, $team_income, $rate, $memberid, $
 
         walletTransfer($sponsorid, $amount, 'debit', $wallet, 'Special Trading Bonus', 'Special Trading Bonus Amount Added into wallet.');
     }
+}
+
+function team_biz_update($sponsorid, $value)
+{
+    $limit = 21;
+    for ($i = 1; $i < $limit; $i++) {
+        if ($sponsorid != 'Root') {
+            $query = MemberDetail::where('memberid', $sponsorid)->first();
+            $query->team_biz += $value;
+            $query->save();
+            $sponsorid = $query->sponsorid;
+        }
+    }
+}
+
+function getJWttoken()
+{
+    $curl = curl_init();
+    curl_setopt($curl, CURLOPT_URL, "https://api.nowpayments.io/v1/auth");
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+    $post = array(
+        'email' => env('email'),
+        'password' => env('password'),
+    );
+
+    $post = json_encode($post);
+    curl_setopt($curl, CURLOPT_POSTFIELDS, $post);
+    curl_setopt($curl, CURLOPT_POST, 1);
+
+    $headers = array();
+    $headers[] = "Content-Type: application/json";
+    $headers[] = "x-api-key: " .env('nowpayments_api_key');
+    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+
+    $result = curl_exec($curl);
+    curl_close($curl);
+    $response = json_decode($result, true);
+    return $response['token'];
 }

@@ -29,30 +29,35 @@
                 </div>
             </div>
         </div>
+
+
         <div class="row">
             <div class="col-md-12">
-                @if (session()->has('wMessage'))
-                    <div class="alert alert-primary">{{ session('wMessage') }}</div>
+            @include('admin.partials.history-date-filter')
+                @if (session()->has('successMsg'))
+                    <div class="alert alert-primary">{{ session('successMsg') }}</div>
+                @endif
+                 @if (session()->has('failedMsg'))
+                    <div class="alert alert-danger">{{ session('failedMsg') }}</div>
                 @endif
                 <div class="card" class="overflow:auto">
                     <div class="card-header">
                         <h3>{{ __('Withdrawal Requests') }}</h3>
                     </div>
-                    <div class="card-body mx-3" style="overflow: auto">
+                    <div class="card-body mx-3">
                             <table id="data_table" class="table" style="width: 100%">
                                 <thead>
                                     <tr>
                                         <th>{{ __('S.No') }}</th>
                                         <th>{{ __('Request Date') }}</th>
-                                        <th>{{ __('Request Id') }}</th>
                                         <th>{{ __('Member Id') }}</th>
+                                        <th>{{ __('Name') }}</th>
+                                        <th>{{ __('Type') }}</th>
                                         <th>{{ __('Wallet Address') }}</th>
-                                        <!--<th>{{ __('USDT Amount') }}</th>-->
-                                        <th>{{ __('Gross Amount') }}</th>
-                                        <th>{{ __('Charges Amount') }}</th>
-                                        <th>{{ __('Net Amount') }}</th>
-                                        {{-- <th>{{ __('Action') }}</th> --}}
-                                        <th>{{ __('Action') }}</th>
+                                        <th>{{ __('Gross') }}</th>
+                                        <th>{{ __('Charges') }}</th>
+                                        <th>{{ __('Net ') }}</th>
+                                        <th colspan="3" class="text-center">{{ __('Action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -65,16 +70,28 @@
                                             <td>{{ $i }}</td>
                                             <td>{{ date('d-m-Y', strtotime($list['request_date'])) }}<br>{{ date('H:i:s', strtotime($list['request_date'])) }}
                                             </td>
-                                            <td>{{ $list['request_id'] }}</td>
                                             <td>{{ $list['memberid'] }}</td>
-                                            <td>{{ $list['wallet_address'] }}</td>
-                                            <!--<td>$ {{ $list['usdt_amount'] }}</td>-->
-                                            <td>$ {{ number_format($list['gross_amount'],2) }}</td>
-                                            <td>$ {{ number_format($list['service_charge'],2) }}</td>
-                                            <td>$ {{ number_format($list['net_amount'],2) }}</td>
+                                            <td>{{ getName($list['memberid'])}}</td>
+                                            <td><span class="badge badge-primary"><b>{{ $list['type'] }}</b></span></td>
+                                            <td style="display:block; width:150px ">{{ $list['wallet_address'] }}</td>
+                                            <td>${{ $list['gross_amount'] }}</td>
+                                            <td>${{ $list['service_charge'] }}</td>
+                                            <td>${{ $list['net_amount'] }}</td>
                                             <td class="px-0">
-                                                <a href="{{ url('admin/withdrawal/withdrawal-comment') }}/{{ $list['id'] }}"
-                                                    class="btn btn-sm btn-info mx-">Withdrawal Comment</a>
+                                                <a href="{{ url('admin/withdrawal-accept/') }}/{{ $list['id'] }}"
+                                                    class="btn btn-sm btn-success mx-0">Online Pay</a>
+                                            </td>
+                                            <td class="px-0">
+                                                <form action="{{ route('withdrawal.accept', $list['id']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to accept this withdrawal request?');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-primary mx-2">Accept</button>
+                                                </form>
+                                            </td>
+                                            <td class="px-0">
+                                                <form action="{{ route('withdrawal.cancel', $list['id']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this withdrawal request?');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-danger mx-0">Cancel</button>
+                                                </form>
                                             </td>
                                         </tr>
                                         @php $i++;  @endphp

@@ -53,6 +53,7 @@
                         send message
                     </div>
                 </div>
+                <div class="col-xl-6">
                 @if (session()->has('successMsg'))
                     <div class="alert alert-success alert-dismissible fade show custom-alert-icon shadow-sm" role="alert">
                         <svg style="fill: rgb(var(--success-rgb));" xmlns="http://www.w3.org/2000/svg" height="1.5rem"
@@ -75,7 +76,6 @@
                         {{ session('failedMsg') }}
                     </div>
                 @endif
-                <div class="col-xl-6">
                     <div class="card custom-card">
                         <div class="top-left"></div>
                         <div class="top-right"></div>

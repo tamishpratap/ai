@@ -41,7 +41,7 @@ class WithdrawalService
                 throw new RuntimeException('Your Last Withdrawal Still Pending. Please Wait.');
             }
 
-            $minimumWithdrawal = (float) Setting::get('minimum_withdrawal', 20);
+            $minimumWithdrawal = (float) Setting::get('minimum_withdrawal', 10);
             if ($amount < $minimumWithdrawal) {
                 throw new RuntimeException("Invalid Amount Entered. Amount must be at least \${$minimumWithdrawal}.");
             }
@@ -51,7 +51,7 @@ class WithdrawalService
                 throw new RuntimeException('Invalid Amount Entered. Amount can not be greater than wallet balance.');
             }
 
-            $feePercentage = (float) Setting::get('withdrawal_fee_percentage', 10);
+            $feePercentage = (float) Setting::get('withdrawal_fee_percentage', 5);
             $fee = round($amount * $feePercentage / 100, 8);
             $netAmount = $amount - $fee;
 

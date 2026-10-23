@@ -75,16 +75,16 @@
         </div>
         <div class="col-xxl-6 col-xl-6 col-lg-12">
             <div class="row justify-content-center align-items-center h-100 member-auth-shell">
-                <div class="col-xxl-8 col-xl-9 col-lg-8 col-md-8 col-sm-10 col-12">
+                <div class="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-12">
                     <div class="card member-auth-card shadow-none my-4">
-                        <form action="{{ route('userRegister') }}" method="post">
+                        <form action="{{ route('userRegister') }}" method="post" id="signupForm">
                             @csrf
                             <div class="card-body">
-                                <div class="member-auth-head">
+                                <div class="member-auth-head justify-content-center">
                                     <a href="{{ url('/member') }}">
                                         <img src="{{ asset('logo/logo.png') }}" alt="logo" width="80px">
                                     </a>
-                                    <span class="member-auth-icon"><i class="ti ti-user-plus"></i></span>
+                                    <!--<span class="member-auth-icon"><i class="ti ti-user-plus"></i></span>-->
                                 </div>
                                 <div class="member-auth-form-wrap">
                                     <div class="member-auth-form-head">
@@ -130,7 +130,7 @@
                                             @enderror
                                         </div>
 
-                                        <div class="member-auth-field--full">
+                                        {{-- <div class="member-auth-field--full">
                                             <label class="form-label member-auth-label">Placement Side<sup>*</sup></label>
                                             <div class="d-flex gap-3">
                                                 <div class="form-check">
@@ -145,7 +145,7 @@
                                             @error('position')
                                                 <span class="small text-danger">{{ $message }}</span>
                                             @enderror
-                                        </div>
+                                        </div> --}}
 
                                         <div>
                                             <label for="signup-name" class="form-label member-auth-label">Name<sup>*</sup></label>
@@ -237,7 +237,7 @@
                                     </div>
 
                                     <div class="d-grid mt-4">
-                                        <button type="submit" class="btn member-auth-submit">Create Account</button>
+                                        <button type="submit" class="btn member-auth-submit" id="btnSignupSubmit">Create Account</button>
                                     </div>
 
                                     <div class="text-center member-auth-footer-note">
@@ -254,6 +254,16 @@
         </div>
     </div>
 
+    <style>
+        .member-auth-submit:disabled,
+        .member-auth-submit.disabled {
+            opacity: 0.65 !important;
+            cursor: not-allowed !important;
+            pointer-events: none !important;
+            filter: grayscale(0.5);
+        }
+    </style>
+
     <script src="{{ asset('mem_assets/libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ asset('mem_assets/libs/swiper/swiper-bundle.min.js') }}"></script>
     <link rel="modulepreload" href="{{ asset('mem_assets/authentication-WetCL-A9.js') }}" />
@@ -262,6 +272,10 @@
     <script src="https://code.jquery.com/jquery-3.6.1.min.js"></script>
     <script>
         $(document).ready(function() {
+            var isSubmitting = false;
+            var $form = $('#signupForm');
+            var $btn = $('#btnSignupSubmit');
+
             $('#sponsor').on('input', function() {
                 var sponsor = $(this).val();
 
@@ -279,6 +293,24 @@
                         $('#sponhtml').html(response['data'])
                     }
                 })
+            });
+
+            // Prevent multiple clicks: disable button on submit
+            $form.on('submit', function(e) {
+                if (isSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+                isSubmitting = true;
+                $btn.prop('disabled', true).addClass('disabled').html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Please wait...');
+            });
+
+            // Re-enable button when user edits / changes any field
+            $form.find('input, select').on('input change keyup', function() {
+                if (isSubmitting) {
+                    isSubmitting = false;
+                    $btn.prop('disabled', false).removeClass('disabled').html('Create Account');
+                }
             });
         })
     </script>

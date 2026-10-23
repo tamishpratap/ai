@@ -22,16 +22,39 @@ class LevelsController extends Controller
         $result['data'] = MemberDetail::where('memberid', $memberid)->first();
         $result['d_data'] = $result['data'];
         $result['directs'] = MemberDetail::where('sponsorid', $memberid)->get();
+
+        $genealogyData = $this->buildLevelGenealogy($result['d_data']);
+        $result['tree'] = $genealogyData['tree'];
+        $result['levels'] = $genealogyData['levels'];
+        $result['totalMembersCount'] = $genealogyData['totalMembersCount'];
+        $result['maxLevel'] = $genealogyData['maxLevel'];
+        $result['is_root_view'] = true;
+
         return view('member.team.geneology')->with($result);
     }
 
     public function ViewGeneology($did)
     {
-        $memberid = session('MEMBER_ID');
-        $result['data'] = MemberDetail::where('memberid', $memberid)->first();
-        $result['d_data'] = MemberDetail::find($did);
+        $loggedInMemberId = session('MEMBER_ID');
+        $result['data'] = MemberDetail::where('memberid', $loggedInMemberId)->first();
+        $target = is_numeric($did) ? MemberDetail::find($did) : MemberDetail::where('memberid', $did)->first();
+
+        if (!$target) {
+            session()->flash('searchMsg', 'Member not found');
+            session()->flash('failedMsg', 'Member not found');
+            return redirect()->to('member/team/geneology');
+        }
+
+        $result['d_data'] = $target;
         $memberid = $result['d_data']['memberid'];
         $result['directs'] = MemberDetail::where('sponsorid', $memberid)->get();
+
+        $genealogyData = $this->buildLevelGenealogy($result['d_data']);
+        $result['tree'] = $genealogyData['tree'];
+        $result['levels'] = $genealogyData['levels'];
+        $result['totalMembersCount'] = $genealogyData['totalMembersCount'];
+        $result['maxLevel'] = $genealogyData['maxLevel'];
+        $result['is_root_view'] = ($memberid === $loggedInMemberId);
 
         return view('member.team.view-geneology')->with($result);
     }
@@ -41,21 +64,115 @@ class LevelsController extends Controller
         $request->validate([
             'searchid' => 'required'
         ]);
-        $result['data'] =  MemberDetail::where('memberid', session('MEMBER_ID'))->first();
-        $memberid = $result['data']['memberid'];
-        $searchid = $request->post('searchid');
+        $loggedInMemberId = session('MEMBER_ID');
+        $result['data'] = MemberDetail::where('memberid', $loggedInMemberId)->first();
+        $searchid = trim($request->post('searchid'));
         $result['d_data'] = MemberDetail::where('memberid', $searchid)->first();
+
         if (!$result['d_data']) {
+            session()->flash('searchMsg', 'This memberid is not registered with us');
             session()->flash('failedMsg', 'This memberid is not registered with us');
             return redirect()->to('member/team/geneology');
         }
-        if ($memberid == $searchid) {
-            session()->flash('failedMsg', 'You have entered your own memberid');
-            return redirect()->to('member/team/geneology');
-        }
+
         $memberid = $result['d_data']['memberid'];
         $result['directs'] = MemberDetail::where('sponsorid', $memberid)->get();
+
+        $genealogyData = $this->buildLevelGenealogy($result['d_data']);
+        $result['tree'] = $genealogyData['tree'];
+        $result['levels'] = $genealogyData['levels'];
+        $result['totalMembersCount'] = $genealogyData['totalMembersCount'];
+        $result['maxLevel'] = $genealogyData['maxLevel'];
+        $result['is_root_view'] = ($memberid === $loggedInMemberId);
+
         return view('member.team.geneology')->with($result);
+    }
+
+    /**
+     * Build dynamic level-wise genealogy data structure starting from a root member.
+     * Uses batch queries per level for performance, with cycle/loop protection.
+     */
+    private function buildLevelGenealogy($rootMember)
+    {
+        if (!$rootMember) {
+            return [
+                'tree' => null,
+                'levels' => [],
+                'totalMembersCount' => 0,
+                'maxLevel' => 0,
+            ];
+        }
+
+        $rootId = $rootMember->memberid;
+        $visited = [$rootId => true];
+        $levels = [];
+        $membersBySponsor = [];
+        $currentSponsorIds = [$rootId];
+        $levelIndex = 1;
+        $maxDepthLimit = 20;
+        $totalMembersCount = 0;
+
+        while (!empty($currentSponsorIds) && $levelIndex <= $maxDepthLimit) {
+            $children = MemberDetail::whereIn('sponsorid', $currentSponsorIds)->get();
+            if ($children->isEmpty()) {
+                break;
+            }
+
+            $nextSponsorIds = [];
+            $currentLevelMembers = [];
+
+            foreach ($children as $child) {
+                if (isset($visited[$child->memberid])) {
+                    continue;
+                }
+                $visited[$child->memberid] = true;
+
+                $child->level = $levelIndex;
+                $currentLevelMembers[] = $child;
+                $membersBySponsor[$child->sponsorid][] = $child;
+                $nextSponsorIds[] = $child->memberid;
+            }
+
+            if (empty($currentLevelMembers)) {
+                break;
+            }
+
+            $levels[$levelIndex] = $currentLevelMembers;
+            $totalMembersCount += count($currentLevelMembers);
+            $currentSponsorIds = $nextSponsorIds;
+            $levelIndex++;
+        }
+
+        $treeVisited = [$rootId => true];
+        $rootMember->level = 0;
+        $this->attachTreeChildren($rootMember, $membersBySponsor, $treeVisited, 1);
+
+        return [
+            'tree' => $rootMember,
+            'levels' => $levels,
+            'totalMembersCount' => $totalMembersCount,
+            'maxLevel' => count($levels),
+        ];
+    }
+
+    private function attachTreeChildren(&$parent, &$membersBySponsor, &$treeVisited, $level)
+    {
+        $pid = $parent->memberid;
+        $children = $membersBySponsor[$pid] ?? [];
+        $attachedChildren = [];
+
+        foreach ($children as $child) {
+            if (isset($treeVisited[$child->memberid])) {
+                continue;
+            }
+            $treeVisited[$child->memberid] = true;
+            $child->level = $level;
+            $this->attachTreeChildren($child, $membersBySponsor, $treeVisited, $level + 1);
+            $attachedChildren[] = $child;
+        }
+
+        $parent->children = $attachedChildren;
+        $parent->children_count = count($attachedChildren);
     }
 
     public function lelMemTable()

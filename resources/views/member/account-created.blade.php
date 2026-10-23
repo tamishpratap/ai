@@ -74,14 +74,14 @@
         </div>
         <div class="col-xxl-6 col-xl-6 col-lg-12">
             <div class="row justify-content-center align-items-center h-100 member-auth-shell">
-                <div class="col-xxl-9 col-xl-10 col-lg-9 col-md-10 col-sm-10 col-12">
+                <div class="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-12">
                     <div class="card member-auth-card shadow-none my-4">
                         <div class="card-body">
-                            <div class="member-auth-head">
+                            <div class="member-auth-head justify-content-center">
                                 <a href="{{ url('/member') }}">
                                     <img src="{{ asset('logo/logo.png') }}" alt="logo" width="80px">
                                 </a>
-                                <span class="member-auth-icon"><i class="ti ti-user-circle"></i></span>
+                                <!--<span class="member-auth-icon"><i class="ti ti-user-circle"></i></span>-->
                             </div>
 
                             <div class="member-auth-form-wrap">

@@ -827,22 +827,22 @@
                     <!-- End::header-element -->
 
                     <!-- Start::header-element -->
-                    <li class="header-element dropdown">
+                    <li class="header-element dropdown mb-2">
                         <!-- Start::header-link|dropdown-toggle -->
                         <a href="javascript:void(0);" class="header-link dropdown-toggle member-profile-toggle" id="mainHeaderProfile"
                             data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                             <div class="d-flex align-items-center">
-                                <!-- <div>
+                                <div>
                                     @if ($data['profile_image'] != '')
-<img src="{{ asset('uploads') }}/{{ $data['profile_image'] }}"
+                                        <img src="{{ asset('uploads') }}/{{ $data['profile_image'] }}"
                                             alt="img" class="avatar avatar-sm rounded-0">
-@else
-<img src="{{ asset('uploads/avatar.jpg') }}" alt="img"
+                                    @else
+                                        <img src="{{ asset('uploads/avatar.jpg') }}" alt="img"
                                             class="avatar avatar-sm rounded-0">
-@endif
+                                    @endif
                                     {{-- <img src="{{ asset('mem_assets/images/faces/22.jpg') }}" alt="img"
                                         class="avatar avatar-sm rounded-0"> --}}
-                                </div>  -->
+                                </div> 
                                 <span class="mx-2">{{ $data['memberid'] }}</span>
                             </div>
                         </a>
@@ -1014,6 +1014,11 @@
                                     <a href="{{ url('/member/profile/security') }}" class="side-menu__item">Change
                                         Password</a>
                                 </li>
+                                
+                                <li class="slide">
+                                    <a href="{{ url('/member/profile/wallet-address') }}"
+                                        class="side-menu__item">Settings (Wallet Address)</a>
+                                </li>
 
                             </ul>
                         </li>
@@ -1065,21 +1070,21 @@
                         <li class="slide has-sub">
                             <a href="javascript:void(0);" class="side-menu__item">
                                 <i class="bx bxs-bank " style="font-size: 16px"></i>
-                                <span class="side-menu__label mx-2">Deposit Section</span>
+                                <span class="side-menu__label mx-2">Add Fund</span>
                                 <i class="fe fe-chevron-right side-menu__angle"></i>
                             </a>
                             <ul class="slide-menu child1">
                                 <li class="slide side-menu__label1">
-                                    <a href="javascript:void(0)">Deposit Fund</a>
+                                    <a href="javascript:void(0)">Add Fund</a>
                                 </li>
 
                                 <li class="slide">
-                                    <a href="{{ url('/member/fund/import-fund') }}" class="side-menu__item">Deposit
+                                    <a href="{{ url('/member/fund/import-fund') }}" class="side-menu__item">Add
                                         Fund</a>
                                 </li>
                                 <li class="slide">
                                     <a href="{{ url('/member/fund/import-fund-history') }}"
-                                        class="side-menu__item">Deposit Fund History</a>
+                                        class="side-menu__item">Add Fund History</a>
                                 </li>
 
                             </ul>
@@ -1110,10 +1115,9 @@
 
                             </ul>
                         </li>
-                        <!-- End::slide -->
 
                         <!-- Start::slide -->
-                        <li class="slide has-sub">
+                         <li class="slide has-sub">
                             <a href="javascript:void(0);" class="side-menu__item">
                                 <div class="side-menu__icon mt-1">
                                     <i class="bx bx-money"></i>
@@ -1129,17 +1133,12 @@
                                 <!--    </a>-->
                                 <!--</li>-->
 
-                                <li class="slide">
+                                 <li class="slide">
                                     <a href="{{ url('member/income/staking-incomes') }}" class="side-menu__item">Staking
                                         Income
                                     </a>
                                 </li>
 
-                                <!--<li class="slide">-->
-                                <!--    <a href="{{ url('member/income/level-details') }}" class="side-menu__item">Level-->
-                                <!--        Details-->
-                                <!--    </a>-->
-                                <!--</li>-->
 
                                 <li class="slide">
                                     <a href="{{ url('member/income/level-incomes') }}" class="side-menu__item">Level
@@ -1147,9 +1146,51 @@
                                     </a>
                                 </li>
 
+                                <li class="slide">
+                                    <a href="{{ url('member/income/direct-incomes') }}" class="side-menu__item">Direct
+                                        Income
+                                    </a>
+                                </li>
+
+                                <!--<li class="slide">-->
+                                <!--    <a href="{{ url('member/income/monthly-roi-incomes') }}" class="side-menu__item">Monthly ROI-->
+                                <!--        Income-->
+                                <!--    </a>-->
+                                <!--</li>-->
+
                             </ul>
                         </li>
+                        
                         <li class="slide has-sub">
+                            <a href="javascript:void(0);" class="side-menu__item">
+                                <div class="side-menu__icon mt-1">
+                                    <i class="bx bx-money-withdraw"></i>
+                                </div>
+                                <span class="side-menu__label">Reward Section</span>
+                                <i class="fe fe-chevron-right side-menu__angle"></i>
+                            </a>
+                            <ul class="slide-menu child1">
+                                <li class="slide side-menu__label1">
+                                    <a href="javascript:void(0)">Reward Section </a>
+                                </li>
+
+                                <li class="slide">
+                                    <a href="{{ url('member/income/reward-incomes') }}" class="side-menu__item">Reward
+                                        Income
+                                    </a>
+                                </li>
+                                
+                                <li class="slide">
+                                    <a href="{{ url('member/income/reward-details') }}" class="side-menu__item">Reward
+                                        Details
+                                    </a>
+                                </li>
+
+                            </ul>
+                        </li>
+                        <!-- End::slide -->
+                        
+                         <li class="slide has-sub">
                             <a href="javascript:void(0);" class="side-menu__item">
                                 <div class="side-menu__icon mt-1">
                                     <i class="bx bx-group"></i>
@@ -1220,8 +1261,8 @@
                                         class="side-menu__item">Withdrawal History</a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{{ url('/member/profile/wallet-address') }}"
-                                        class="side-menu__item">Settings (Wallet Address)</a>
+                                    <a href="{{ url('/member/wallet/wallet-to-p2p') }}" class="side-menu__item">
+                                        Wallet to P2P Transfer</a>
                                 </li>
                                 <li class="slide">
                                     <a href="{{ url('/member/wallet/all-transaction') }}" class="side-menu__item">

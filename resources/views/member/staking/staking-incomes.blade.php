@@ -58,7 +58,7 @@
                                                         <td>{{ $i }}</td>
                                                         <td>{{ date('d-m-Y', strtotime($list['created_at'])) }}</td>
                                                         <td>{{ $list['memberid'] }}</td>
-                                                        <td>$ {{ $list['total_investment'] }}</td>
+                                                        <td>$ {{ number_format($list['total_investment'], 2) }}</td>
                                                         <td>{{ $list['rate'] }} %</td>
                                                         <td>{{ $list['installment'] }}</td>
                                                         <td>$ {{ $list['amount'] }}</td>

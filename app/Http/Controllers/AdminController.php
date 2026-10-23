@@ -14,6 +14,7 @@ use App\Models\ImportFund;
 use App\Models\LevelIncome;
 use App\Models\MemberDetail;
 use App\Models\Package;
+use App\Models\RewardIncome;
 use App\Models\PackageDetail;
 use App\Models\RankIncome;
 use App\Models\SetRate;
@@ -22,6 +23,7 @@ use App\Models\StakingDetail;
 use App\Models\StakingIncome;
 use App\Models\WithdrawalRequest;
 use App\Services\WithdrawalService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -50,11 +52,11 @@ class AdminController extends Controller
                     'otp' => $otp,
                 ];
                 $user['to'] = $email;
-                // Mail::send('admin.mails.login-mail', $mailData, function ($message) use ($user) {
+                Mail::send('admin.mails.login-mail', $mailData, function ($message) use ($user) {
 
-                //     $message->to($user['to']);
-                //     $message->subject('Gain Arbitrage Bot Admin Login OTP');
-                // });
+                    $message->to($user['to']);
+                    $message->subject('Quantum ARB Admin Login OTP');
+                });
             }
             session()->flash('OtpMsg', 'Your OTP has been send to admin email');
             return redirect()->back();
@@ -171,20 +173,25 @@ class AdminController extends Controller
                 'password' => $password
             ];
             $user['to'] = $email;
-            // Mail::send('admin.mails.forget-password-mail', $mailData, function ($message) use ($user) {
+            Mail::send('admin.mails.forget-password-mail', $mailData, function ($message) use ($user) {
 
-            //     $message->to($user['to']);
-            //     $message->subject('Gain Arbitrage Bot Admin Account Password');
-            // });
+                $message->to($user['to']);
+                $message->subject('Quantum ARB Admin Account Password');
+            });
         }
         session()->flash('succMsg', 'Your Account Password has been sent to your registered email.');
         return redirect()->back();
     }
 
-    public function details()
+    public function details(Request $request)
     {
-        $result['data'] = MemberDetail::orderby('created_at', 'desc')->get();
-
+        $query = MemberDetail::query();
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at', [
+            'created_at'   => 'Joining Date',
+            'activated_at' => 'Activation Date',
+        ]);
+        $result['data'] = $filter['query']->orderby('created_at', 'desc')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.member-details')->with($result);
     }
 
@@ -224,8 +231,93 @@ class AdminController extends Controller
         if ($result) {
             $request->session()->put('MEMBER_LOGIN', true);
             $request->session()->put('MEMBER_ID', $result->memberid);
+            $request->session()->put('show_popup_modal', true);
             return redirect('member/dashboard');
         }
+    }
+
+    public function popupImage()
+    {
+        $result['popupImage'] = Setting::get('dashboard_popup_image', '');
+        $result['popupStatus'] = Setting::get('dashboard_popup_status', '1');
+        $result['popupTitle'] = Setting::get('dashboard_popup_title', '');
+        $result['popupLink'] = Setting::get('dashboard_popup_link', '');
+        return view('admin.popup-image')->with($result);
+    }
+
+    public function popupImageUpdate(Request $request)
+    {
+        $request->validate([
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp,gif|max:5120',
+            'title' => 'nullable|string|max:255',
+            'link' => 'nullable|string|max:500',
+            'status' => 'nullable|in:0,1',
+        ]);
+
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
+            $extension = $file->getClientOriginalExtension();
+            $filename = 'popup_' . time() . '_' . rand(1000, 9999) . '.' . $extension;
+
+            $uploadPath = public_path('uploads');
+            if (!file_exists($uploadPath)) {
+                @mkdir($uploadPath, 0777, true);
+            }
+
+            $file->move($uploadPath, $filename);
+
+            $oldImage = Setting::get('dashboard_popup_image');
+            if (!empty($oldImage) && file_exists(public_path('uploads/' . $oldImage))) {
+                @unlink(public_path('uploads/' . $oldImage));
+            }
+
+            Setting::set('dashboard_popup_image', $filename);
+        }
+
+        if ($request->has('title')) {
+            Setting::set('dashboard_popup_title', $request->post('title') ?? '');
+        }
+
+        if ($request->has('link')) {
+            Setting::set('dashboard_popup_link', $request->post('link') ?? '');
+        }
+
+        if ($request->has('status')) {
+            Setting::set('dashboard_popup_status', $request->post('status') == '1' ? '1' : '0');
+        }
+
+        session()->flash('uploadMsg', 'Popup Image settings updated successfully!');
+        return redirect()->back();
+    }
+
+    public function popupImageToggleStatus()
+    {
+        $currentStatus = Setting::get('dashboard_popup_status', '1');
+        $newStatus = ($currentStatus == '1') ? '0' : '1';
+        Setting::set('dashboard_popup_status', $newStatus);
+
+        $msg = ($newStatus == '1') ? 'Dashboard Popup Image is now Active (Visible to members)' : 'Dashboard Popup Image is now Inactive (Hidden from members)';
+        session()->flash('uploadMsg', $msg);
+        return redirect()->back();
+    }
+
+    public function popupImageDelete()
+    {
+        $image = Setting::get('dashboard_popup_image');
+        if (!empty($image) && file_exists(public_path('uploads/' . $image))) {
+            @unlink(public_path('uploads/' . $image));
+        }
+
+        Setting::set('dashboard_popup_image', '');
+        Setting::set('dashboard_popup_status', '0');
+
+        session()->flash('delMsg', 'Dashboard Popup Image has been removed successfully!');
+        return redirect()->back();
+    }
+
+    public function acheivImage(Request $request)
+    {
+        return $this->popupImageUpdate($request);
     }
 
     public function dashMessages()
@@ -305,9 +397,12 @@ class AdminController extends Controller
         return redirect()->back();
     }
 
-    public function accountControl()
+    public function accountControl(Request $request)
     {
-        $result['data'] = MemberDetail::where('status', '!=', 'Temp')->orderby('created_at', 'desc')->get();
+        $query = MemberDetail::where('status', '!=', 'Temp');
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['data'] = $filter['query']->orderby('created_at', 'desc')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.account-control')->with($result);
     }
 
@@ -344,33 +439,250 @@ class AdminController extends Controller
         return view('admin.wallet-address')->with($result);
     }
 
-    public function stakingDetails()
+    /**
+     * Apply theme-compatible date filtering to an Eloquent query for admin history tables.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query
+     * @param \Illuminate\Http\Request $request
+     * @param string $defaultColumn
+     * @param array $allowedDateColumns Mapping of column => label (e.g. ['payment_date' => 'Payment Date', 'request_date' => 'Request Date'])
+     * @return array ['query' => Builder, 'filterData' => array]
+     */
+    protected function applyAdminDateFilter($query, Request $request, string $defaultColumn, array $allowedDateColumns = [])
     {
-        $result['sdata'] = StakingDetail::orderby('created_at', 'DESC')->get();
+        $tz = config('app.timezone', 'Asia/Kolkata');
+        $filterMode = $request->query('filter_mode');
+        $filterDate = $request->query('filter_date');
+        $preset = $request->query('preset');
+        $fromDate = $request->query('from_date');
+        $toDate = $request->query('to_date');
+        $dateFieldInput = $request->query('date_field');
+
+        // 1. Validate & resolve date column safely
+        $selectedColumn = $defaultColumn;
+        $dateOptions = [];
+        if (!empty($allowedDateColumns)) {
+            $dateOptions = $allowedDateColumns;
+            if ($dateFieldInput && array_key_exists($dateFieldInput, $allowedDateColumns)) {
+                $selectedColumn = $dateFieldInput;
+            }
+        } else {
+            $dateOptions = [$defaultColumn => 'Date'];
+        }
+
+        $activeFilter = false;
+        $badgeText = '';
+        $validationError = null;
+        $startDate = null;
+        $endDate = null;
+
+        // Helper to validate Y-m-d format
+        $isValidDate = function ($dateStr) {
+            if (!is_string($dateStr) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+                return false;
+            }
+            $parts = explode('-', $dateStr);
+            return checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0]);
+        };
+
+        // Mode 1: Single Date Filter
+        if ($filterMode === 'single' || (!empty($filterDate) && empty($filterMode))) {
+            if (!empty($filterDate)) {
+                if ($isValidDate($filterDate)) {
+                    $startDate = $filterDate . ' 00:00:00';
+                    $endDate = $filterDate . ' 23:59:59';
+                    $activeFilter = true;
+                    $formattedDate = Carbon::parse($filterDate)->format('d M Y');
+                    $colLabel = $dateOptions[$selectedColumn] ?? 'Date';
+                    $badgeText = count($dateOptions) > 1 ? "$colLabel: $formattedDate" : $formattedDate;
+                } else {
+                    $validationError = 'Please select a valid date in YYYY-MM-DD format.';
+                }
+            }
+        }
+        // Mode 2: Advanced Date Filter
+        elseif ($filterMode === 'advanced' || !empty($preset) || !empty($fromDate) || !empty($toDate)) {
+            $from = null;
+            $to = null;
+            $presetLabel = null;
+
+            $now = Carbon::now($tz);
+
+            if (!empty($preset) && $preset !== 'custom') {
+                switch ($preset) {
+                    case 'today':
+                        $from = $now->copy()->toDateString();
+                        $to = $now->copy()->toDateString();
+                        $presetLabel = 'Today';
+                        break;
+                    case 'yesterday':
+                        $from = $now->copy()->subDay()->toDateString();
+                        $to = $now->copy()->subDay()->toDateString();
+                        $presetLabel = 'Yesterday';
+                        break;
+                    case 'last_7_days':
+                        $from = $now->copy()->subDays(6)->toDateString();
+                        $to = $now->copy()->toDateString();
+                        $presetLabel = 'Last 7 Days';
+                        break;
+                    case 'last_30_days':
+                        $from = $now->copy()->subDays(29)->toDateString();
+                        $to = $now->copy()->toDateString();
+                        $presetLabel = 'Last 30 Days';
+                        break;
+                    case 'this_month':
+                        $from = $now->copy()->startOfMonth()->toDateString();
+                        $to = $now->copy()->endOfMonth()->toDateString();
+                        $presetLabel = 'This Month';
+                        break;
+                    case 'last_month':
+                        $from = $now->copy()->subMonthNoOverflow()->startOfMonth()->toDateString();
+                        $to = $now->copy()->subMonthNoOverflow()->endOfMonth()->toDateString();
+                        $presetLabel = 'Last Month';
+                        break;
+                    case 'this_year':
+                        $from = $now->copy()->startOfYear()->toDateString();
+                        $to = $now->copy()->endOfYear()->toDateString();
+                        $presetLabel = 'This Year';
+                        break;
+                    default:
+                        $validationError = 'Invalid preset option selected.';
+                        break;
+                }
+
+                if ($from && $to) {
+                    $fromDate = $from;
+                    $toDate = $to;
+                }
+            }
+
+            if (!empty($fromDate) || !empty($toDate)) {
+                if (empty($fromDate) || empty($toDate)) {
+                    $validationError = 'Both From Date and To Date are required for date range filtering.';
+                } elseif (!$isValidDate($fromDate) || !$isValidDate($toDate)) {
+                    $validationError = 'Invalid date format provided for date range.';
+                } elseif ($toDate < $fromDate) {
+                    $validationError = 'To Date cannot be earlier than From Date.';
+                } else {
+                    $from = $fromDate;
+                    $to = $toDate;
+                }
+            }
+
+            if ($from && $to && empty($validationError)) {
+                $startDate = $from . ' 00:00:00';
+                $endDate = $to . ' 23:59:59';
+                $activeFilter = true;
+
+                $colLabel = $dateOptions[$selectedColumn] ?? 'Date';
+                $colPrefix = count($dateOptions) > 1 ? "$colLabel: " : "";
+
+                if ($presetLabel && $preset !== 'custom') {
+                    $badgeText = $colPrefix . $presetLabel;
+                } else {
+                    $fFormatted = Carbon::parse($from)->format('d M Y');
+                    $tFormatted = Carbon::parse($to)->format('d M Y');
+                    $badgeText = $fFormatted === $tFormatted ? "$colPrefix$fFormatted" : "$colPrefix$fFormatted – $tFormatted";
+                }
+            }
+        }
+
+        // Apply date filter boundaries to query
+        if ($startDate && $endDate) {
+            $query->where($selectedColumn, '>=', $startDate)
+                  ->where($selectedColumn, '<=', $endDate);
+        }
+
+        $filterData = [
+            'filter_mode'      => $filterMode,
+            'filter_date'      => $filterDate,
+            'preset'           => $preset,
+            'from_date'        => $fromDate,
+            'to_date'          => $toDate,
+            'date_field'       => $selectedColumn,
+            'date_options'     => $dateOptions,
+            'active_filter'    => $activeFilter,
+            'badge_text'       => $badgeText,
+            'validation_error' => $validationError,
+        ];
+
+        return [
+            'query'      => $query,
+            'filterData' => $filterData,
+        ];
+    }
+
+    public function stakingDetails(Request $request)
+    {
+        $query = StakingDetail::query();
+        $filter = $this->applyAdminDateFilter($query, $request, 'invest_date');
+        $result['sdata'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.income.staking-details')->with($result);
     }
 
-    public function stakingIncomes()
+    public function stakingIncomes(Request $request)
     {
-        $result['sdata'] = StakingIncome::orderby('created_at', 'DESC')->get();
+        $query = StakingIncome::query();
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['sdata'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.income.daily-income')->with($result);
     }
 
-    public function levelDetails()
+    public function levelDetails(Request $request)
     {
-        $result['sdata'] = StakingDetail::where('type', 'Level Income')->orderby('created_at', 'DESC')->get();
+        $query = StakingDetail::where('type', 'Level Income');
+        $filter = $this->applyAdminDateFilter($query, $request, 'invest_date');
+        $result['sdata'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.income.level-details')->with($result);
     }
 
-    public function levelIncomes()
+    public function levelIncomes(Request $request)
     {
-        $result['sdata'] = LevelIncome::orderby('created_at', 'DESC')->get();
+        $query = LevelIncome::query();
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['sdata'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.income.level-income')->with($result);
     }
-
-    public function packageDetails()
+    
+    public function rewardIncomes(Request $request)
     {
-        $result['pdata'] = PackageDetail::orderby('created_at', 'DESC')->get();
+        $query = RewardIncome::query();
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['sdata'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['rdata'] = $result['sdata'];
+        $result['filterData'] = $filter['filterData'];
+        return view('admin.income.reward-income')->with($result);
+    }
+
+    public function directIncomes(Request $request)
+    {
+        $query = DirectIncome::query();
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['sdata'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['ddata'] = $result['sdata'];
+        $result['filterData'] = $filter['filterData'];
+        return view('admin.income.direct-income')->with($result);
+    }
+
+    public function monthlyRoiIncomes(Request $request)
+    {
+        $query = StakingIncome::query();
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['sdata'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
+        return view('admin.income.monthly-roi-income')->with($result);
+    }
+    
+    public function packageDetails(Request $request)
+    {
+        $query = PackageDetail::query();
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['pdata'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.package-details')->with($result);
     }
 
@@ -380,9 +692,12 @@ class AdminController extends Controller
         return view('admin/funds/new-funds-requests', $result);
     }
 
-    public function fundsHistory()
+    public function fundsHistory(Request $request)
     {
-        $result['data'] = FundRequest::where('status','!=','Requested')->orderby('created_at', 'DESC')->get();
+        $query = ImportFund::where('added_by', 'User');
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['data'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.funds.request-history')->with($result);
     }
 
@@ -399,15 +714,27 @@ class AdminController extends Controller
         return view('admin.withdrawal-comment')->with($result);
     }
 
-    public function cancelledRequest()
+    public function cancelledRequest(Request $request)
     {
-        $result['data'] = WithdrawalRequest::where('status', 'Cancelled')->orderby('created_at', 'DESC')->get();
+        $query = WithdrawalRequest::where('status', 'Cancelled');
+        $filter = $this->applyAdminDateFilter($query, $request, 'updated_at', [
+            'updated_at'   => 'Cancellation Date',
+            'request_date' => 'Request Date',
+        ]);
+        $result['data'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.cancelled-request')->with($result);
     }
 
-    public function paymentHistory()
+    public function paymentHistory(Request $request)
     {
-        $result['data'] = WithdrawalRequest::where('status', 'Approved')->orderby('created_at', 'DESC')->get();
+        $query = WithdrawalRequest::where('status', 'Approved');
+        $filter = $this->applyAdminDateFilter($query, $request, 'payment_date', [
+            'payment_date' => 'Payment Date',
+            'request_date' => 'Request Date',
+        ]);
+        $result['data'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.payment-history')->with($result);
     }
 
@@ -417,19 +744,12 @@ class AdminController extends Controller
         return view('admin.payment-history')->with($result);
     }
 
-    public function wAccept(Request $request, $id, WithdrawalService $withdrawalService)
+    public function wAccept(Request $request, $id)
     {
-        $request->validate([
-            'transaction_hash' => 'required|string|max:255',
-            'comment' => 'nullable|string',
-        ]);
-
-        try {
-            $withdrawalService->approveWithdrawal((int) $id, $request->post('transaction_hash'), $request->post('comment'));
-        } catch (\Throwable $e) {
-            session()->flash('wMessage', $e->getMessage());
-            return redirect()->back();
-        }
+            $withdrawal = WithdrawalRequest::where('id', $id)->lockForUpdate()->first();
+            $withdrawal->status = 'Approved';
+            $withdrawal->payment_date = now();
+            $withdrawal->save();
 
         session()->flash('wMessage', 'Withdrawal request has been accepted successfully!');
         return redirect('/admin/new-withdrawal-request');
@@ -632,16 +952,22 @@ class AdminController extends Controller
         return redirect()->back();
     }
 
-    public function addFundsDetails()
+    public function addFundsDetails(Request $request)
     {
-        $result['data'] = ImportFund::where('added_by', 'Admin')->orderby('created_at', 'DESC')->get();
+        $query = ImportFund::where('added_by', 'Admin');
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['data'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.funds.add-funds-details')->with($result);
     }
 
-    public function requestsHistory()
+    public function requestsHistory(Request $request)
     {
         //$result['coins'] = ConvertPrize::find(1);
-        $result['data'] = ImportFund::where('added_by', 'User')->orderby('created_at', 'DESC')->get();
+        $query = ImportFund::where('added_by', 'User');
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['data'] = $filter['query']->orderby('created_at', 'DESC')->get();
+        $result['filterData'] = $filter['filterData'];
         return view('admin.funds.request-history')->with($result);
     }
 
@@ -678,38 +1004,38 @@ class AdminController extends Controller
         'binary_closing_time',
     ];
 
-    public function mlmSettings()
-    {
-        $result['settings'] = collect(self::MLM_SETTING_KEYS)
-            ->mapWithKeys(fn ($key) => [$key => Setting::get($key)])
-            ->toArray();
-        return view('admin.settings.mlm-settings')->with($result);
-    }
+    // public function mlmSettings()
+    // {
+    //     $result['settings'] = collect(self::MLM_SETTING_KEYS)
+    //         ->mapWithKeys(fn ($key) => [$key => Setting::get($key)])
+    //         ->toArray();
+    //     return view('admin.settings.mlm-settings')->with($result);
+    // }
 
-    public function mlmSettingsUpdate(Request $request)
-    {
-        $request->validate([
-            'direct_referral_percentage' => 'required|numeric|min:0',
-            'binary_matching_percentage' => 'required|numeric|min:0',
-            'maximum_income_percentage' => 'required|numeric|min:0',
-            'minimum_withdrawal' => 'required|numeric|min:0',
-            'withdrawal_fee_percentage' => 'required|numeric|min:0',
-            'withdrawal_status' => 'required|in:enabled,disabled',
-            'p2p_transfer_fee_percentage' => 'required|numeric|min:0',
-            'p2p_transfer_status' => 'required|in:enabled,disabled',
-            'deposit_status' => 'required|in:enabled,disabled',
-            'trading_reward_status' => 'required|in:enabled,disabled',
-            'binary_closing_status' => 'required|in:enabled,disabled',
-            'binary_closing_time' => 'required',
-        ]);
+    // public function mlmSettingsUpdate(Request $request)
+    // {
+    //     $request->validate([
+    //         'direct_referral_percentage' => 'required|numeric|min:0',
+    //         'binary_matching_percentage' => 'required|numeric|min:0',
+    //         'maximum_income_percentage' => 'required|numeric|min:0',
+    //         'minimum_withdrawal' => 'required|numeric|min:0',
+    //         'withdrawal_fee_percentage' => 'required|numeric|min:0',
+    //         'withdrawal_status' => 'required|in:enabled,disabled',
+    //         'p2p_transfer_fee_percentage' => 'required|numeric|min:0',
+    //         'p2p_transfer_status' => 'required|in:enabled,disabled',
+    //         'deposit_status' => 'required|in:enabled,disabled',
+    //         'trading_reward_status' => 'required|in:enabled,disabled',
+    //         'binary_closing_status' => 'required|in:enabled,disabled',
+    //         'binary_closing_time' => 'required',
+    //     ]);
 
-        foreach ($request->only(self::MLM_SETTING_KEYS) as $key => $value) {
-            Setting::set($key, $value);
-        }
+    //     foreach ($request->only(self::MLM_SETTING_KEYS) as $key => $value) {
+    //         Setting::set($key, $value);
+    //     }
 
-        session()->flash('successMsg', 'Settings updated successfully.');
-        return redirect()->back();
-    }
+    //     session()->flash('successMsg', 'Settings updated successfully.');
+    //     return redirect()->back();
+    // }
 
     public function packages()
     {
@@ -724,6 +1050,109 @@ class AdminController extends Controller
         $package->save();
 
         session()->flash('successMsg', 'Package status updated successfully.');
+        return redirect()->back();
+    }
+    public function freePinAccount(Request $request)
+    {
+        $query = MemberDetail::where('status', 'Temp');
+        $filter = $this->applyAdminDateFilter($query, $request, 'created_at');
+        $result['data'] = $filter['query']->orderby('created_at', 'desc')->get();
+        $result['filterData'] = $filter['filterData'];
+        return view('admin.members.free-pin-account')->with($result);
+    }
+
+     public function PinUserAccount(Request $request)
+    {
+        $memberid = $request->post('memberid');
+        $package = $request->post('package');
+        $amount = $request->post('amount');
+
+        if ($package == NULL) {
+            session()->flash('failedMsg', 'Please enter package first');
+            return redirect()->back();
+        }
+
+        if ($amount < 0) {
+            session()->flash('failedMsg', 'Not valid amount entered');
+            return redirect()->back();
+        }
+
+        // if ($amount < 50) {
+        //     session()->flash('failedMsg', 'Minimum amount must be or greater than $50');
+        //     return redirect()->back();
+        // }
+
+         // Check package according to investment amount
+        if ($amount >= 100 && $amount <= 1000) {
+
+            if ($package != 'Silver') {
+                session()->flash('failedMsg', 'Please select Silver package for this investment amount.');
+                return redirect()->back()->withInput();
+            }
+
+            $packageName = 'Silver';
+        } elseif ($amount >= 1100 && $amount <= 5000) {
+
+            if ($package != 'Gold') {
+                session()->flash('failedMsg', 'Please select Gold package for this investment amount.');
+                return redirect()->back()->withInput();
+            }
+
+            $packageName = 'Gold';
+        } elseif ($amount >= 5100 && $amount <= 10000) {
+
+            if ($package != 'Platinum') {
+                session()->flash('failedMsg', 'Please select Platinum package for this investment amount.');
+                return redirect()->back()->withInput();
+            }
+
+            $packageName = 'Platinum';
+        } elseif ($amount >= 11000) {
+
+            if ($package != 'Diamond') {
+                session()->flash('failedMsg', 'Please select Diamond package for this investment amount.');
+                return redirect()->back()->withInput();
+            }
+
+            $packageName = 'Diamond';
+        } else {
+            session()->flash('failedMsg', 'Invalid investment amount.');
+            return redirect()->back()->withInput();
+        }
+
+        // if($package % 10 != 0){
+        //     session()->flash('failedMsg', 'Package must be multiple of $10');
+        //     return redirect()->back();
+        // }
+
+
+        $memUpdate = MemberDetail::where('memberid', $memberid)->first();
+        $sponsorid = $memUpdate->sponsorid;
+
+        $memUpdate->activated_by = 'Admin';
+        $memUpdate->self_biz = $amount;
+        $memUpdate->package = $amount;
+        $memUpdate->package_name = $packageName;
+        if ($memUpdate->status == 'Temp') {
+            $memUpdate->status = 'Active';
+            $memUpdate->activated_at = date('Y-m-d H:i:s');
+            updateUpline($sponsorid, $memberid);
+            updateDownline($sponsorid);
+        }
+        $memUpdate->save();
+
+        $var = new StakingDetail();
+        $var->memberid = $memberid;
+        $var->invest_date = date('Y-m-d H:i:s');
+        $var->invest_amount = $amount;
+        $var->package = $package;
+        $var->package_name = $packageName;
+        $var->rate = 0;
+        $var->activated_by = 'Admin';
+        $var->status = 'Deactive';
+        $var->save();
+
+        session()->flash('successMsg', 'Member has been activated successfully.');
         return redirect()->back();
     }
 }

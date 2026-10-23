@@ -34,6 +34,7 @@
         </div>
         <div class="row">
             <div class="col-lg-8 col-md-12">
+            @include('admin.partials.history-date-filter')
                 <div class="card">
                     <div class="card-header">
                         <h3>Closed Chat</h3>
