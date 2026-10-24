@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\FrontendController;
 use App\Http\Controllers\IraNavigationController;
+use App\Http\Controllers\IraFormController;
 use App\Http\Controllers\FundController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\LevelsController;
@@ -11,6 +12,8 @@ use App\Http\Controllers\TempController;
 use App\Http\Controllers\StakingController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\WithdrawalController;
+use App\Http\Controllers\ChatAi\AdminAiChatController;
+use App\Http\Controllers\ChatAi\MemberAiChatController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -141,6 +144,8 @@ Route::group(['prefix' => 'admin', 'middleware' => 'AdminAuth'], function () {
   //member-gallery
   Route::get('/member-gallery', [AdminController::class, 'memGallery']);
   Route::get('/member-gallery/status-change/{id}', [AdminController::class, 'memGalStatusChange']);
+  Route::get('/ai/chat', [AdminAiChatController::class, 'index'])->name('admin.ai.chat');
+  Route::post('/ai/chat', [AdminAiChatController::class, 'chat'])->name('admin.ai.chat.send')->middleware('throttle:20,1');
 });
 
 //Member Routes
@@ -259,10 +264,16 @@ Route::group(['prefix' => 'member', 'middleware' => 'MemberAuth'], function () {
   //gallery
   Route::get('/gallery/member-gallery', [MemberDetailController::class, 'gallery']);
   Route::post('/galleryUpdate', [MemberDetailController::class, 'galleryUpdate'])->name('galleryUpdate');
+  Route::get('/ai/chat', [MemberAiChatController::class, 'index'])->name('member.ai.chat');
+  Route::post('/ai/chat', [MemberAiChatController::class, 'chat'])->name('member.ai.chat.send')->middleware('throttle:20,1');
 });
 
 // Phase 2: IRA Voice Navigation Intent Endpoint
 Route::post('/ira/intent', [IraNavigationController::class, 'resolve'])->name('ira.intent');
+
+// Phase 7: IRA Voice Form Filling Endpoints
+Route::post('/ira/form-step', [IraFormController::class, 'formStep'])->name('ira.form-step');
+Route::get('/ira/forms-for-page', [IraFormController::class, 'formsForPage'])->name('ira.forms-for-page');
 
 Route::fallback(function () {
   return view('member.error404');

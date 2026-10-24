@@ -167,10 +167,19 @@
                     </div>
                     <div class="col-xl-5">
                         <div class="member-wallet-panel member-wallet-panel--form h-100">
-                            <div class="member-wallet-form__top">
-                                <div class="member-wallet-panel__eyebrow">Withdrawal Request</div>
+                            <div class="member-wallet-form__top d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                <div>
+                                    <div class="member-wallet-panel__eyebrow">Withdrawal Request</div>
                                 <h3 class="member-wallet-form__title">Secure withdrawal form</h3>
-                                <p class="member-wallet-panel__subtitle mb-0">Enter the amount and transaction password to continue.</p>
+                                    <p class="member-wallet-panel__subtitle mb-0">Enter the amount and transaction password to continue.</p>
+                                </div>
+                                <button type="button" class="ira-form-fill-btn" data-ira-form="member_wallet_withdrawal" title="Fill with IRA Voice AI">
+                                    <svg class="ira-form-fill-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                                    </svg>
+                                    <span>AI Fill Form</span>
+                                </button>
                             </div>
                             <form action="{{ route('initWithdrawal') }}" method="post" class="myForm member-wallet-form">
                                 @csrf

@@ -894,7 +894,7 @@
                 <div class="arb-popup-header">
                     <h6 class="arb-popup-title">
                         <i class="bx bx-bell" style="font-size: 20px;"></i>
-                        <span>{{ !empty($popupTitle) ? $popupTitle : 'Welcome to QuantumARB' }}</span>
+                        <span>{{ !empty($popupTitle) ? $popupTitle : 'Welcome to Demo' }}</span>
                     </h6>
                     <button type="button" class="arb-popup-close-btn" id="arbBtnCross" title="Close">
                         <i class="bx bx-x" style="pointer-events: none;"></i>

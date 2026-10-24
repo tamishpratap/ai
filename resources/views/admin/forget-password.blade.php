@@ -37,7 +37,7 @@
                     <div class="col-xl-4 col-lg-4 col-md-4 m-auto">
                         <div class="authentication-form mx-auto pt-0">
                             <div class="logo-centered mt-0 pt-4 mb-3">
-                                <img class="text-center" height="85px" src="{{ asset('logo/logo.png') }}" alt="Logo" >
+                                <img class="text-center" style="height: 60px; width: auto; max-width: 180px; object-fit: contain;" src="{{ asset('logo/logo.png') }}" alt="{{ config('detailsApp.name') }}" >
                                 <!--<a href="#"><h3 class="text-primary"><b>{{config('detailsApp.name')}}</b></h3></a>-->
                             </div>
                             <h5 class="text-danger pb-2 pt-0 text-center">Forget Password ? </h5>

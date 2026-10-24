@@ -3,6 +3,8 @@
 namespace App\Services\AI;
 
 use App\Services\AI\AppNavigationOntology;
+use App\Services\AI\IraFormRegistry;
+use App\Services\AI\IraFormUnderstandingService;
 use App\Services\Gemini\GeminiService;
 use Illuminate\Support\Facades\Log;
 
@@ -570,7 +572,8 @@ class IraNavigationService
     ];
 
     public function __construct(
-        protected GeminiService $gemini
+        protected GeminiService $gemini,
+        protected ?IraFormUnderstandingService $formUnderstanding = null
     ) {
         $this->destinations = AppNavigationOntology::getAllDestinations();
         $this->sidebarSections = AppNavigationOntology::getSidebarSections();
@@ -622,6 +625,47 @@ class IraNavigationService
         $deterministic = $this->resolveDeterministic($clean, $role, $currentPage, $detectedLang, $context);
         if ($deterministic !== null) {
             return $deterministic;
+        }
+
+        // 2b. Form Filling Understanding (when user is on a page with a registered form)
+        if ($this->formUnderstanding !== null && !empty($currentPage)) {
+            $formsOnPage = IraFormRegistry::findFormsByPath($currentPage, $role);
+            if (!empty($formsOnPage)) {
+                $formKey = $context['active_form_key'] ?? array_key_first($formsOnPage);
+                $formResult = $this->formUnderstanding->processFormTurn(
+                    $clean,
+                    $formKey,
+                    $role,
+                    (array) ($context['current_fields'] ?? []),
+                    $context
+                );
+
+                if (!empty($formResult['form_updates'])
+                    || in_array($formResult['status'] ?? '', ['status_query', 'form_reset', 'sensitive_field_blocked', 'file_input_blocked', 'readonly_field'], true)
+                ) {
+                    return [
+                        'success' => true,
+                        'intent' => 'form_fill',
+                        'destination_key' => null,
+                        'target_url' => null,
+                        'form_key' => $formResult['form_key'],
+                        'form_title' => $formResult['form_title'] ?? '',
+                        'form_selector' => $formResult['form_selector'],
+                        'form_updates' => $formResult['form_updates'],
+                        'remaining_required' => $formResult['remaining_required'] ?? [],
+                        'sensitive_skipped' => $formResult['sensitive_skipped'] ?? [],
+                        'warnings' => $formResult['warnings'] ?? [],
+                        'speech' => $formResult['speech'],
+                        'response_language' => $formResult['speech_language'] ?? 'hinglish',
+                        'confidence' => 0.95,
+                        'needs_clarification' => false,
+                        'context' => array_merge($context, [
+                            'active_form_key' => $formResult['form_key'],
+                            'last_intent' => 'form_fill',
+                        ]),
+                    ];
+                }
+            }
         }
 
         // 3. Gemini AI intent resolution fallback (preserved with strict role validation)

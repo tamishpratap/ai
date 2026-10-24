@@ -1,6 +1,7 @@
-{{-- Quantum ARB IRA Voice Navigation Assistant Component --}}
+{{-- Demo IRA Voice Navigation Assistant Component --}}
 @once
 <link rel="stylesheet" href="{{ asset('ira/ira-assistant.css') }}?v={{ file_exists(public_path('ira/ira-assistant.css')) ? filemtime(public_path('ira/ira-assistant.css')) : '1.0' }}">
+<link rel="stylesheet" href="{{ asset('ira/ira-form-filler.css') }}?v={{ file_exists(public_path('ira/ira-form-filler.css')) ? filemtime(public_path('ira/ira-form-filler.css')) : '1.0' }}">
 
 <!-- Floating Action Launcher Container -->
 <div id="iraFloatingContainer" class="ira-floating-container" role="region" aria-label="IRA Voice Navigation Controls">
@@ -42,7 +43,7 @@
                                 {{ (session()->has('ADMIN_ID') || session()->get('ADMIN_LOGIN') === true) ? 'Admin' : ((session()->has('MEMBER_ID') || session()->get('MEMBER_LOGIN') === true) ? 'Member' : 'Public') }}
                             </span>
                         </div>
-                        <small class="text-muted ira-header-subtitle">Quantum ARB Voice AI</small>
+                        <small class="text-muted ira-header-subtitle">Demo Voice AI</small>
                     </div>
                 </div>
 
@@ -179,6 +180,8 @@
 window.IRA_CONFIG = {
     csrfToken: "{{ csrf_token() }}",
     intentEndpoint: "{{ route('ira.intent') }}",
+    formEndpoint: "{{ route('ira.form-step') }}",
+    formsForPageEndpoint: "{{ route('ira.forms-for-page') }}",
     currentPage: window.location.pathname,
     role: "{{ (session()->has('ADMIN_ID') || session()->get('ADMIN_LOGIN') === true) ? 'admin' : ((session()->has('MEMBER_ID') || session()->get('MEMBER_LOGIN') === true) ? 'member' : 'guest') }}",
     userName: "{{ session('name') ?: (session('ADMIN_EMAIL') ?: 'User') }}",
@@ -190,4 +193,5 @@ window.IRA_CONFIG = {
 };
 </script>
 <script src="{{ asset('ira/ira-assistant.js') }}?v={{ file_exists(public_path('ira/ira-assistant.js')) ? filemtime(public_path('ira/ira-assistant.js')) : '1.0' }}" defer></script>
+<script src="{{ asset('ira/ira-form-filler.js') }}?v={{ file_exists(public_path('ira/ira-form-filler.js')) ? filemtime(public_path('ira/ira-form-filler.js')) : '1.0' }}" defer></script>
 @endonce

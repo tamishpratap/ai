@@ -496,8 +496,8 @@
                 <div class="url-card">
                     <div class="url-icon">🌐</div>
                     <div class="url-label">Platform URL</div>
-                    <div class="url-value">https://qunatumarb.world/</div>
-                    <a href="https://qunatumarb.world/" class="url-link">📍 Visit Platform</a>
+                    <div class="url-value">{{ url('/') }}</div>
+                    <a href="{{ url('/') }}" class="url-link">📍 Visit Platform</a>
                 </div>
 
                 <!-- Security Notice -->

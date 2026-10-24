@@ -1,13 +1,20 @@
 <!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" >
 <head>
-	<title>@yield('title','') | Radmin - Laravel Admin Starter</title>
+	<title>@yield('title','') | {{ config('detailsApp.name', 'Demo') }}</title>
 	<!-- initiate head with meta tags, css and script -->
 	<meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <meta name="description" content="">
     <meta name="keywords" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- FAVICONS ICON -->
+    <link rel="icon" type="image/png" href="{{ asset('logo/favicon/favicon-96x96.png') }}" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="{{ asset('logo/favicon/favicon.svg') }}" />
+    <link rel="shortcut icon" href="{{ asset('logo/favicon/favicon.ico') }}" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('logo/favicon/apple-touch-icon.png') }}" />
+    <link rel="manifest" href="{{ asset('logo/favicon/site.webmanifest') }}" />
 
 
     <!-- font awesome library -->
@@ -139,7 +146,7 @@
             <div class="sidebar-header">
                 <a class="header-brand" href="{{route('dashboard')}}">
                     <div class="logo-img">
-                       <img width="30" src="{{ asset('adm_assets/assets/img/logo.png')}}" class="header-brand-img" title="RADMIN"> 
+                       <img width="30" src="{{ asset('logo/logo.png') }}" class="header-brand-img" title="Demo" alt="Demo" style="height: auto; object-fit: contain;"> 
                     </div>
                 </a>
                 <div class="sidebar-action"><i class="ik ik-arrow-left-circle"></i></div>

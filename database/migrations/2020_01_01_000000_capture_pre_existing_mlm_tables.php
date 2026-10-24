@@ -88,7 +88,7 @@ return new class extends Migration
             Schema::create('upline_members', function (Blueprint $table) {
                 $table->increments('id');
                 $table->string('memberid');
-                for ($i = 1; $i <= 10; $i++) {
+                for ($i = 1; $i <= 20; $i++) {
                     $table->string("upline_{$i}")->nullable();
                 }
                 $table->timestamps();
