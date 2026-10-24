@@ -87,7 +87,7 @@
 
                             <div class="form-group mb-3">
                                 <label class="font-weight-bold">{{ __('Action Button Link / URL (Optional)') }}</label>
-                                <input type="url" class="form-control" name="link" value="{{ old('link', $popupLink) }}" placeholder="e.g. https://t.me/quantum_arb or member/staking">
+                                <input type="url" class="form-control" name="link" value="{{ old('link', $popupLink) }}" placeholder="e.g. https://t.me/demo or member/staking">
                                 <small class="text-muted"><i class="ik ik-link mr-1"></i> Optional link if you want members to click through when seeing the popup.</small>
                                 @error('link')
                                     <span class="text-danger small">{{ $message }}</span>

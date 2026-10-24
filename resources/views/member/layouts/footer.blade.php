@@ -56,16 +56,7 @@
 
    <footer class="footer mt-auto py-3 text-center">
        <div class="container">
-           <span class="text-muted"> Copyright ©
-               <script>
-                   document.write(new Date().getFullYear())
-               </script>
-               {{ config('detailsApp.name') }}
-               All
-               rights
-               reserved <br><a href="https://www.mlmsoftwaredeveloper.live/" target="_blank"
-                   class="developer-link">Developed By The Crypto Developers</a>
-           </span>
+           <span class="text-muted">© {{ date('Y') }} Demo. All rights reserved.</span>
        </div>
    </footer>
    <!-- END FOOTER -->

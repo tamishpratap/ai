@@ -55,7 +55,7 @@ class AdminController extends Controller
                 Mail::send('admin.mails.login-mail', $mailData, function ($message) use ($user) {
 
                     $message->to($user['to']);
-                    $message->subject('Quantum ARB Admin Login OTP');
+                    $message->subject('Demo Admin Login OTP');
                 });
             }
             session()->flash('OtpMsg', 'Your OTP has been send to admin email');
@@ -176,7 +176,7 @@ class AdminController extends Controller
             Mail::send('admin.mails.forget-password-mail', $mailData, function ($message) use ($user) {
 
                 $message->to($user['to']);
-                $message->subject('Quantum ARB Admin Account Password');
+                $message->subject('Demo Admin Account Password');
             });
         }
         session()->flash('succMsg', 'Your Account Password has been sent to your registered email.');

@@ -38,6 +38,7 @@
         sessionFinalTranscript: '',
         sessionInterimTranscript: '',
         hasDispatchedTurn: false,
+        guideState: null,
 
         /**
          * Initialize the IRA assistant
@@ -50,6 +51,8 @@
             this.config = Object.assign({
                 csrfToken: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 intentEndpoint: '/ira/intent',
+                formEndpoint: '/ira/form-step',
+                formsForPageEndpoint: '/ira/forms-for-page',
                 role: 'guest',
                 userName: 'Visitor',
                 isAuthenticated: false,
@@ -95,6 +98,9 @@
 
             // Bind Event Listeners
             this.bindEvents();
+
+            // Phase 7 Hotfix: Mount visible AI Form-Fill buttons to eligible registered forms
+            this.mountFormFillButtons();
 
             this.initialized = true;
             console.log('[IRA] Voice Navigation Assistant initialized. Role: ' + this.config.role + ', Locale: ' + this.selectedLocale);
@@ -777,15 +783,23 @@
             if (this.elements.modal) {
                 // When modal closes via backdrop or Esc
                 this.elements.modal.addEventListener('hidden.bs.modal', () => {
+                    if (this.formFillMode) {
+                        return;
+                    }
                     this.isAbortedByUser = true;
                     this.stopAll();
+                    this.clearFormFillMode();
                     document.body.classList.remove('ira-panel-open');
                 });
 
                 if (window.$) {
                     $(this.elements.modal).on('hidden.bs.modal', () => {
+                        if (this.formFillMode) {
+                            return;
+                        }
                         this.isAbortedByUser = true;
                         this.stopAll();
+                        this.clearFormFillMode();
                         document.body.classList.remove('ira-panel-open');
                     });
                 }
@@ -929,7 +943,13 @@
             }
 
             this.setUserUtterance(clean);
-            this.processIntentTurn(clean);
+
+            // Phase 7 Hotfix: Route active form session directly to form-step endpoint
+            if (this.formFillMode && this.activeFormKey) {
+                this.sendFormStep(clean, this.activeFormKey);
+            } else {
+                this.processIntentTurn(clean);
+            }
         },
 
         /**
@@ -940,6 +960,14 @@
 
             const intentEndpoint = this.config.intentEndpoint || '/ira/intent';
             const currentPage = window.location.pathname;
+
+            // Phase 7: Detect active page form and scrape non-sensitive fields
+            const activeForm = this.detectActiveForm();
+            const currentFields = activeForm ? this.scrapeCurrentFormFields(activeForm.formEl) : {};
+            const contextPayload = Object.assign({}, this.recentContext || {}, {
+                active_form_key: activeForm ? activeForm.key : null,
+                current_fields: currentFields
+            });
 
             try {
                 const response = await fetch(intentEndpoint, {
@@ -953,7 +981,7 @@
                         speech: spokenText,
                         current_page: currentPage,
                         current_mode: this.mode,
-                        context: this.recentContext || {}
+                        context: contextPayload
                     })
                 });
 
@@ -1064,6 +1092,15 @@
                             this.startListening();
                         }, 400);
                     });
+                    return true;
+                }
+
+                // Phase 7: Handle Form Filling Intent
+                if (result.intent === 'form_fill') {
+                    if (Array.isArray(result.form_updates) && result.form_updates.length > 0) {
+                        this.applyFormUpdates(result.form_updates, result.form_selector);
+                    }
+                    this.speak(speechToSay);
                     return true;
                 }
 
@@ -1510,6 +1547,542 @@
             }
         },
 
+        /**
+         * Phase 7: Comprehensive Registry of All Eligible Application Forms
+         */
+        getFormRules: function () {
+            return [
+                // Member Portal Forms
+                { key: 'member_wallet_withdrawal', selector: 'form[action*="initWithdrawal"]', title: 'Withdrawal Form' },
+                { key: 'member_p2p_transfer', selector: 'form[action*="fundTrans"]', title: 'P2P Transfer' },
+                { key: 'member_wallet_to_p2p', selector: 'form[action*="walletP2pTransfer"]', title: 'Wallet to P2P Transfer' },
+                { key: 'member_staking', selector: '#stakingForm, form[action*="createStaking"]', title: 'Staking Package' },
+                { key: 'member_fund_import', selector: '#myForm, form[action*="instantFunds"]', title: 'Deposit Funds' },
+                { key: 'member_support_create', selector: 'form[action*="createTicket"]', title: 'Support Ticket' },
+                { key: 'member_support_reply', selector: 'form[action*="MbReplyTicket"]', title: 'Ticket Reply' },
+                { key: 'member_profile_user_summary', selector: 'form[action*="insertProfile"]', title: 'Profile Summary' },
+                { key: 'member_profile_wallet_address', selector: 'form[action*="insertWalletAddress"]', title: 'Wallet Address' },
+                { key: 'member_security_txn_password', selector: 'form[action*="txnpassChange"]', title: 'Transaction Password' },
+                { key: 'member_security_login_password', selector: 'form[action*="passChange"]', title: 'Login Password' },
+                { key: 'member_security_email', selector: 'form[action*="emailChange"]', title: 'Change Email' },
+                { key: 'member_team_geneology_search', selector: 'form[action*="searchGenelogy"]', title: 'Geneology Search' },
+
+                // Admin Portal Forms
+                { key: 'admin_funds_add', selector: 'form[action*="addMemFunds"]', title: 'Add Member Funds' },
+                { key: 'admin_funds_deduct', selector: 'form[action*="deductMemFunds"]', title: 'Deduct Member Funds' },
+                { key: 'admin_set_rates', selector: 'form[action*="rateUpdate"]', title: 'Exchange Rates' },
+                { key: 'admin_free_pin_account', selector: 'form[action*="PinUserAccount"]', title: 'Free Pin Account' },
+                { key: 'admin_dash_messages', selector: 'form[action*="dashMsg"]', title: 'Dashboard Message' },
+                { key: 'admin_wallet_address', selector: 'form[action*="updateWallet"]', title: 'Admin Wallet Address' },
+                { key: 'admin_popup_image', selector: 'form[action*="popupImageUpdate"]', title: 'Popup Announcement' },
+                { key: 'admin_achievers_image', selector: 'form[action*="acheivImage"]', title: 'Achievers Image' },
+                { key: 'admin_withdrawal_accept_comment', selector: 'form[action*="withdrawal.accept"]', title: 'Withdrawal Accept' },
+                { key: 'admin_withdrawal_cancel_comment', selector: 'form[action*="withdrawal.cancel"]', title: 'Withdrawal Reject' },
+                { key: 'admin_date_filter', selector: '#advancedDateFilterForm', title: 'History Date Filter' },
+                { key: 'admin_support_reply', selector: 'form[action*="Ticket"]', title: 'Admin Ticket Reply' },
+                { key: 'admin_member_update', selector: 'form[action*="updateDetails"]', title: 'Member Profile Update' },
+                { key: 'admin_member_security', selector: 'form[action*="securityUpdate"]', title: 'Member Security Override' },
+                { key: 'admin_profile_email', selector: 'form[action*="changeEmail"]', title: 'Admin Email Update' },
+
+                // Public / Guest Portal Forms
+                { key: 'public_member_signup', selector: '#signupForm, form[action*="userRegister"]', title: 'Member Sign Up' },
+                { key: 'public_member_signin', selector: 'form[action*="userLogin"]', title: 'Member Sign In' },
+                { key: 'public_admin_login', selector: 'form[action*="adminLogin"]', title: 'Admin Login' },
+                { key: 'public_member_forget_password', selector: 'form[action*="memretrivePassword"]', title: 'Recover Password' }
+            ];
+        },
+
+        getFormRule: function (key) {
+            return this.getFormRules().find(r => r.key === key) || null;
+        },
+
+        /**
+         * Detect active registered form on current page
+         */
+        detectActiveForm: function () {
+            if (this.activeFormKey) {
+                const rule = this.getFormRule(this.activeFormKey);
+                const el = this.activeFormEl || (rule ? document.querySelector(rule.selector) : null);
+                if (el) {
+                    return { key: this.activeFormKey, selector: rule ? rule.selector : '', formEl: el };
+                }
+            }
+
+            const formRules = this.getFormRules();
+            for (const rule of formRules) {
+                const el = document.querySelector(rule.selector);
+                if (el) {
+                    return { key: rule.key, selector: rule.selector, formEl: el };
+                }
+            }
+            return null;
+        },
+
+        /**
+         * Mount visible AI Form-Fill button to every eligible registered form on the page
+         */
+        mountFormFillButtons: function () {
+            const rules = this.getFormRules();
+
+            rules.forEach(rule => {
+                const formEl = document.querySelector(rule.selector);
+                if (!formEl) return;
+
+                // Check if button already exists in the DOM for this form
+                let existingBtn = document.querySelector(`.ira-form-fill-btn[data-ira-form="${rule.key}"]`);
+                if (existingBtn) {
+                    this.bindFormFillButton(existingBtn, rule.key);
+                    return;
+                }
+
+                if (formEl.dataset.iraFormMounted === 'true') return;
+
+                // Create the visible button
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'ira-form-fill-btn';
+                btn.setAttribute('data-ira-form', rule.key);
+                btn.setAttribute('title', `Fill ${rule.title} with IRA Voice AI`);
+                btn.innerHTML = `
+                    <svg class="ira-form-fill-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                    <span>AI Fill Form</span>
+                `;
+
+                // Smart insertion into card header, panel heading, or top of form
+                const parentPanel = formEl.closest('.card, .member-wallet-panel, .panel, .box');
+                const header = parentPanel ? parentPanel.querySelector('.card-header, .card-title, .member-wallet-form__top, .box-header') : null;
+
+                if (header) {
+                    if (header.classList.contains('member-wallet-form__top')) {
+                        header.appendChild(btn);
+                    } else if (header.classList.contains('card-header') || header.classList.contains('box-header')) {
+                        if (!header.classList.contains('d-flex')) {
+                            header.classList.add('d-flex', 'align-items-center', 'justify-content-between', 'gap-2');
+                        }
+                        header.appendChild(btn);
+                    } else {
+                        header.parentNode.insertBefore(btn, header.nextSibling);
+                    }
+                } else {
+                    const topHeading = formEl.querySelector('h2, h3, h4, h5, legend, .card-title');
+                    if (topHeading) {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'd-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap';
+                        topHeading.parentNode.insertBefore(wrapper, topHeading);
+                        wrapper.appendChild(topHeading);
+                        wrapper.appendChild(btn);
+                    } else {
+                        const container = document.createElement('div');
+                        container.className = 'ira-form-fill-container';
+                        container.appendChild(btn);
+                        formEl.insertBefore(container, formEl.firstChild);
+                    }
+                }
+
+                formEl.dataset.iraFormMounted = 'true';
+                this.bindFormFillButton(btn, rule.key);
+            });
+        },
+
+        bindFormFillButton: function (btn, formKey) {
+            if (!btn || btn.dataset.iraBound === 'true') return;
+            btn.dataset.iraBound = 'true';
+
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleFormFillButtonClick(formKey);
+            });
+        },
+
+        handleFormFillButtonClick: async function (formKey) {
+            const rule = this.getFormRule(formKey);
+            const formTitle = rule ? rule.title : 'Form';
+            const formEl = rule ? document.querySelector(rule.selector) : null;
+
+            this.activeFormKey = formKey;
+            this.activeFormEl = formEl;
+            this.formFillMode = true;
+
+            // Apply non-obstructive compact dock styling
+            if (this.elements.modal) {
+                this.elements.modal.classList.add('ira-form-mode');
+            }
+            document.body.classList.add('ira-form-mode-active');
+
+            // Display active form banner inside the assistant modal
+            this.showActiveFormBanner(formTitle, formKey);
+
+            // Open modal to show assistant UI
+            this.openModal();
+
+            const currentFields = this.scrapeCurrentFormFields(formEl);
+            const endpoint = this.config.formEndpoint || '/ira/form-step';
+
+            this.setVoiceState('THINKING');
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': this.config.csrfToken
+                    },
+                    body: JSON.stringify({
+                        action: 'init',
+                        form_key: formKey,
+                        current_page: window.location.pathname,
+                        current_fields: currentFields
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Form init HTTP ' + response.status);
+                }
+
+                const result = await response.json();
+                this.guideState = result.guide_state || null;
+
+                const speech = result.speech || `Main ${formTitle} bharnay ke liye taiyyar hoon.`;
+                this.setAiUtterance(speech);
+
+                // Highlight active field if specified
+                if (result.active_field && result.active_field.selector) {
+                    const targetEl = formEl ? formEl.querySelector(result.active_field.selector) : document.querySelector(result.active_field.selector);
+                    if (targetEl) {
+                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetEl.classList.add('ira-field-highlight');
+                        setTimeout(() => targetEl.classList.remove('ira-field-highlight'), 1800);
+                    }
+                }
+
+                if (result.status === 'all_sensitive' || result.action === 'complete') {
+                    this.speak(speech);
+                    this.setVoiceState('READY');
+                } else {
+                    // Continuous conversational flow: speak prompt and listen when finished
+                    this.speak(speech, () => {
+                        this.startListening();
+                    });
+                }
+            } catch (err) {
+                console.error('[IRA] handleFormFillButtonClick error:', err);
+                const fallbackGreeting = `Main ${formTitle} bharnay ke liye taiyyar hoon. Kripya boliye aap kya bharna chahte hain.`;
+                this.setAiUtterance(fallbackGreeting);
+                this.openModalAndStartListening();
+            }
+        },
+
+        showActiveFormBanner: function (formTitle, formKey) {
+            let banner = document.getElementById('iraActiveFormBanner');
+            if (!banner && this.elements.transcriptArea) {
+                banner = document.createElement('div');
+                banner.id = 'iraActiveFormBanner';
+                banner.className = 'ira-active-form-banner';
+                this.elements.transcriptArea.parentNode.insertBefore(banner, this.elements.transcriptArea);
+            }
+            if (banner) {
+                banner.innerHTML = `
+                    <span><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" class="me-1" style="vertical-align:-1px;"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg> Form Mode: <strong>${formTitle}</strong></span>
+                    <button type="button" class="ira-exit-form-mode" title="Exit form mode">&times;</button>
+                `;
+                banner.classList.remove('d-none');
+
+                const exitBtn = banner.querySelector('.ira-exit-form-mode');
+                if (exitBtn) {
+                    exitBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        this.clearFormFillMode();
+                        this.speak('Form mode se bahar aa gaye hain. Ordinary navigation ke liye bol sakte hain.');
+                    };
+                }
+            }
+        },
+
+        clearFormFillMode: function () {
+            this.activeFormKey = null;
+            this.activeFormEl = null;
+            this.formFillMode = false;
+            this.guideState = null;
+            if (this.elements.modal) {
+                this.elements.modal.classList.remove('ira-form-mode');
+            }
+            document.body.classList.remove('ira-form-mode-active');
+            const banner = document.getElementById('iraActiveFormBanner');
+            if (banner) banner.classList.add('d-none');
+        },
+
+        /**
+         * Scrape current non-sensitive field values from DOM
+         */
+        scrapeCurrentFormFields: function (formEl) {
+            if (!formEl) return {};
+            const data = {};
+            const elements = formEl.querySelectorAll('input, select, textarea');
+
+            elements.forEach(el => {
+                const name = el.getAttribute('name');
+                if (!name) return;
+
+                const type = (el.getAttribute('type') || el.tagName).toLowerCase();
+                // Strictly exclude passwords, PINs, OTPs, captchas, file inputs
+                if (['password', 'file', 'hidden'].includes(type) || name.includes('password') || name.includes('pin') || name.includes('captcha') || name.includes('token')) {
+                    return;
+                }
+
+                if (type === 'checkbox') {
+                    data[name] = el.checked;
+                } else if (type === 'radio') {
+                    if (el.checked) data[name] = el.value;
+                } else {
+                    data[name] = el.value;
+                }
+            });
+
+            return data;
+        },
+
+        /**
+         * Apply structured field updates to DOM inputs without auto-submission
+         */
+        applyFormUpdates: function (updates, formSelector) {
+            if (!Array.isArray(updates) || updates.length === 0) {
+                return { success: true, updatedCount: 0, failedFields: [] };
+            }
+
+            const form = formSelector ? document.querySelector(formSelector) : (this.detectActiveForm()?.formEl || document);
+            let firstScrolled = false;
+            let updatedCount = 0;
+            const failedFields = [];
+
+            updates.forEach(update => {
+                if (!update || !update.name) return;
+
+                // Never voice-fill sensitive fields
+                const nameLower = update.name.toLowerCase();
+                if (nameLower.includes('password') || nameLower.includes('pin') || nameLower.includes('captcha') || nameLower.includes('otp')) {
+                    console.warn('[IRA] Blocked attempt to voice-fill sensitive field:', update.name);
+                    failedFields.push({ field: update.field || update.name, reason: 'sensitive' });
+                    return;
+                }
+
+                let target = null;
+                if (update.selector) {
+                    target = form ? form.querySelector(update.selector) : document.querySelector(update.selector);
+                }
+                if (!target && form) {
+                    target = form.querySelector(`[name="${update.name}"]`);
+                }
+                if (!target) {
+                    target = document.querySelector(`[name="${update.name}"]`);
+                }
+
+                if (!target) {
+                    console.warn('[IRA] Field not found in DOM for update:', update.name);
+                    failedFields.push({ field: update.field || update.name, reason: 'not_found' });
+                    return;
+                }
+
+                const tag = target.tagName.toLowerCase();
+                const type = (target.getAttribute('type') || tag).toLowerCase();
+
+                if (type === 'file') {
+                    console.warn('[IRA] Programmatic file input filling blocked by browser security policy.');
+                    failedFields.push({ field: update.field || update.name, reason: 'file_input' });
+                    return;
+                }
+
+                let domUpdateVerified = false;
+
+                if (tag === 'select') {
+                    let matched = false;
+                    const cleanTargetVal = String(update.value).trim().toLowerCase();
+
+                    for (let i = 0; i < target.options.length; i++) {
+                        const opt = target.options[i];
+                        const optVal = opt.value.trim().toLowerCase();
+                        const optText = opt.textContent.trim().toLowerCase();
+
+                        if (optVal === cleanTargetVal || optText === cleanTargetVal || optText.includes(cleanTargetVal) || cleanTargetVal.includes(optVal)) {
+                            target.selectedIndex = i;
+                            target.value = opt.value;
+                            matched = true;
+                            break;
+                        }
+                    }
+
+                    if (!matched) {
+                        target.value = update.value;
+                    }
+
+                    target.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (window.$ && typeof $(target).trigger === 'function') {
+                        $(target).trigger('change');
+                    }
+                    domUpdateVerified = (target.selectedIndex >= 0 && target.value !== '');
+                } else if (type === 'radio') {
+                    const radios = (form || document).querySelectorAll(`input[type="radio"][name="${update.name}"]`);
+                    radios.forEach(radio => {
+                        if (String(radio.value).trim().toLowerCase() === String(update.value).trim().toLowerCase()) {
+                            radio.checked = true;
+                            radio.dispatchEvent(new Event('change', { bubbles: true }));
+                            if (window.$ && typeof $(radio).trigger === 'function') {
+                                $(radio).trigger('change');
+                            }
+                            domUpdateVerified = true;
+                        }
+                    });
+                } else if (type === 'checkbox') {
+                    target.checked = Boolean(update.value);
+                    target.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (window.$ && typeof $(target).trigger === 'function') {
+                        $(target).trigger('change');
+                    }
+                    domUpdateVerified = true;
+                } else {
+                    target.value = update.value;
+                    target.dispatchEvent(new Event('input', { bubbles: true }));
+                    target.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (window.$ && typeof $(target).trigger === 'function') {
+                        $(target).trigger('input').trigger('change');
+                    }
+                    domUpdateVerified = (String(target.value).trim() === String(update.value).trim());
+                }
+
+                if (domUpdateVerified) {
+                    updatedCount++;
+                    // Scroll first updated element into view
+                    if (!firstScrolled) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        firstScrolled = true;
+                    }
+
+                    // Visual flash glow
+                    target.classList.add('ira-field-highlight');
+                    setTimeout(() => {
+                        target.classList.remove('ira-field-highlight');
+                    }, 1800);
+                } else {
+                    failedFields.push({ field: update.field || update.name, reason: 'dom_verification_failed' });
+                }
+            });
+
+            return {
+                success: failedFields.length === 0,
+                updatedCount: updatedCount,
+                failedFields: failedFields
+            };
+        },
+
+        /**
+         * Dedicated voice form-step execution method via POST /ira/form-step
+         */
+        sendFormStep: async function (spokenText, formKey) {
+            const endpoint = this.config.formEndpoint || '/ira/form-step';
+            const activeForm = this.detectActiveForm();
+            const targetKey = formKey || (activeForm ? activeForm.key : null);
+
+            if (!targetKey) {
+                this.speak('Is page par koi active form nahi mila.');
+                return false;
+            }
+
+            // Quick check for explicit cancel/close
+            if (/^(cancel|close|band\s*karo|hatao|exit)$/i.test(spokenText.trim())) {
+                this.speak('Form filling cancel kiya gaya.');
+                this.clearFormFillMode();
+                this.closeModal();
+                return true;
+            }
+
+            this.setVoiceState('THINKING');
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': this.config.csrfToken
+                    },
+                    body: JSON.stringify({
+                        action: 'turn',
+                        speech: spokenText,
+                        form_key: targetKey,
+                        current_page: window.location.pathname,
+                        current_fields: this.scrapeCurrentFormFields(activeForm?.formEl),
+                        guide_state: this.guideState || {}
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Form step HTTP ' + response.status);
+                }
+
+                const result = await response.json();
+
+                // If user said something meant for general navigation while in form mode, fall back to processIntentTurn
+                if (result.status === 'no_match' && /\b(dashboard|wallet|profile|logout|history|income|team|page|jao|kholo|open)\b/i.test(spokenText)) {
+                    this.clearFormFillMode();
+                    return this.processIntentTurn(spokenText);
+                }
+
+                let domUpdateSuccess = true;
+                if (result.form_updates && result.form_updates.length > 0) {
+                    const domResult = this.applyFormUpdates(result.form_updates, result.form_selector || activeForm?.selector);
+                    if (domResult && domResult.success === false) {
+                        domUpdateSuccess = false;
+                        console.warn('[IRA] DOM update verification failed for fields:', domResult.failedFields);
+                    }
+                }
+
+                if (result.guide_state) {
+                    // If DOM update failed on the targeted field, do not advance to next field prematurely
+                    if (!domUpdateSuccess && this.guideState && this.guideState.current_field) {
+                        result.guide_state.current_field = this.guideState.current_field;
+                    }
+                    this.guideState = result.guide_state;
+                }
+
+                if (result.active_field && result.active_field.selector) {
+                    const form = activeForm?.formEl || document;
+                    const targetEl = form.querySelector(result.active_field.selector);
+                    if (targetEl) {
+                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetEl.classList.add('ira-field-highlight');
+                        setTimeout(() => targetEl.classList.remove('ira-field-highlight'), 1800);
+                    }
+                }
+
+                const speech = result.speech || 'Form update ho gaya hai.';
+                this.setAiUtterance(speech);
+
+                if (result.action === 'complete') {
+                    this.speak(speech);
+                    this.setVoiceState('READY');
+                } else if (result.action === 'exit') {
+                    this.clearFormFillMode();
+                    this.speak(speech);
+                    this.setVoiceState('READY');
+                } else {
+                    // Continuous guided turn: re-arm microphone after speaking prompt
+                    this.speak(speech, () => {
+                        this.startListening();
+                    });
+                }
+                return true;
+            } catch (err) {
+                console.error('[IRA] sendFormStep error:', err);
+                this.setVoiceState('IDLE');
+                this.speak('Form update karne mein dikkat aayi.');
+                return false;
+            }
+        },
+
         toggleFullscreen: function () {
             this.isFullscreen = !this.isFullscreen;
             if (this.elements.modal) {
@@ -1535,4 +2108,11 @@
     } else {
         IraAssistant.init();
     }
+
+    // Re-check mounting once all page resources (stylesheets, deferred plugins) finish loading
+    window.addEventListener('load', () => {
+        if (window.IRA && typeof window.IRA.mountFormFillButtons === 'function') {
+            window.IRA.mountFormFillButtons();
+        }
+    });
 })();

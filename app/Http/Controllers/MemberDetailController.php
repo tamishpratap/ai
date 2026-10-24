@@ -155,7 +155,7 @@ class MemberDetailController extends Controller
             Mail::send('member.mails.mail', $mailData, function ($message) use ($user) {
 
                 $message->to($user['to']);
-                $message->subject('Quantum ARB Member Login Credentials');
+                $message->subject('Demo Member Login Credentials');
             });
         }
         $request->session()->put('name', $request->post('name'));
@@ -474,7 +474,7 @@ class MemberDetailController extends Controller
                 Mail::send('member.mails.forget-password-mail', $mailData, function ($message) use ($user) {
 
                     $message->to($user['to']);
-                    $message->subject('Quantum ARB Member Account Password');
+                    $message->subject('Demo Member Account Password');
                 });
             }
             session()->flash('succMsg', 'Your Account Password has been sent to your registered email.');
@@ -561,7 +561,7 @@ class MemberDetailController extends Controller
             Mail::send('member.mails.mail', $mailData, function ($message) use ($user) {
 
                 $message->to($user['to']);
-                $message->subject('Quantum ARB Member Login Credentials');
+                $message->subject('Demo Member Login Credentials');
             });
         }
         $request->session()->put('name', $request->post('name'));

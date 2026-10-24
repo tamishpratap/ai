@@ -95,7 +95,7 @@
                             <div class="card-body">
                                 <div class="member-auth-head" style="justify-content: center;">
                                     <a href="{{ url('/member') }}">
-                                        <img src="{{ asset('logo/logo.png') }}" alt="logo" width="80px">
+                                        <img src="{{ asset('logo/logo.png') }}" alt="Demo" style="height: auto; max-width: 100px; object-fit: contain;">
                                     </a>
                                     <!--<span class="member-auth-icon"><i class="ti ti-lock"></i></span>-->
                                 </div>
