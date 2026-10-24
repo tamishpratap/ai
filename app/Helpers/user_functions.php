@@ -31,7 +31,7 @@ if (!function_exists('mb_strimwidth')) {
 
 function userId()
 {
-    $userid = "QRB" . rand(100000, 999999);
+    $userid = "DMO" . rand(100000, 999999);
     $member = MemberDetail::where('memberid', $userid)->count();
     if ($member > 0) {
         userId();

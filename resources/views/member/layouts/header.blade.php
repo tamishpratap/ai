@@ -707,7 +707,7 @@
                     <div class="header-element">
                         <div class="horizontal-logo">
                             <a href="{{ url('/') }}" class="header-logo">
-                                <img style="height: 50px;" src="{{ asset('logo/logo.png') }}" alt="logo"
+                                <img style="height: 48px; width: auto; object-fit: contain;" src="{{ asset('logo/logo.png') }}" alt="Demo"
                                     class="desktop-dark">
                             </a>
                         </div>
@@ -890,11 +890,11 @@
             <!-- Start::main-sidebar-header -->
             <div class="main-sidebar-header">
                 <a href="{{ url('/') }}" class="header-logo">
-                    <img src="{{ asset('mem_assets/images/logo.png') }}" alt="logo" class="desktop-logo">
+                    <img src="{{ asset('logo/logo.png') }}" alt="Demo" class="desktop-logo" style="height: 42px; width: auto; object-fit: contain;">
 
-                    <img src="{{ asset('mem_assets/images/logo.png') }}" alt="logo" class="toggle-dark">
-                    <img src="{{ asset('mem_assets/images/logo.png') }}" alt="logo" class="desktop-dark">
-                    <img src="{{ asset('mem_assets/images/logo.pngg') }}" alt="logo" class="toggle-logo">
+                    <img src="{{ asset('logo/logo.png') }}" alt="Demo" class="toggle-dark" style="height: 42px; width: auto; object-fit: contain;">
+                    <img src="{{ asset('logo/logo.png') }}" alt="Demo" class="desktop-dark" style="height: 42px; width: auto; object-fit: contain;">
+                    <img src="{{ asset('logo/logo.png') }}" alt="Demo" class="toggle-logo" style="height: 42px; width: auto; object-fit: contain;">
                 </a>
                 <div class="member-sidebar-brand">
                     <span class="member-sidebar-brand__eyebrow">Private Member Suite</span>
@@ -975,6 +975,28 @@
                             </a>
                         </li>
                         <!-- End::slide -->
+
+                        <!-- Start::slide Voice Assistant -->
+                        <li class="slide">
+                            <a href="javascript:void(0);" class="side-menu__item ira-open-assistant-trigger" data-bs-toggle="modal" data-bs-target="#iraModal">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="side-menu__icon" viewBox="0 0 256 256" width="24" height="24" fill="currentColor">
+                                    <path d="M128,176a48.05,48.05,0,0,0,48-48V64a48,48,0,0,0-96,0v64A48.05,48.05,0,0,0,128,176ZM96,64a32,32,0,0,1,64,0v64a32,32,0,0,1-64,0Zm112,64a8,8,0,0,1-8,8,72.08,72.08,0,0,1-144,0,8,8,0,0,1,16,0,56.06,56.06,0,0,0,112,0A8,8,0,0,1,208,128Zm-72,87.71V232a8,8,0,0,1-16,0V215.71a80.19,80.19,0,0,1-37.49-14.77,8,8,0,1,1,10.6-12A64.13,64.13,0,0,0,120,200a64.13,64.13,0,0,0,26.89-11.06,8,8,0,1,1,10.6,12A80.19,80.19,0,0,1,136,215.71Z"/>
+                                </svg>
+                                <span class="side-menu__label">Navigation AI</span>
+                            </a>
+                        </li>
+                        <!-- End::slide Voice Assistant -->
+
+                        <!-- Start::slide AI Assistant -->
+                        <li class="slide">
+                            <a href="{{ url('/member/ai/chat') }}" class="side-menu__item {{ request()->is('member/ai/chat*') ? 'active' : '' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="side-menu__icon" viewBox="0 0 256 256" width="24" height="24" fill="currentColor">
+                                    <path d="M216,80H184V48a16,16,0,0,0-16-16H40A16,16,0,0,0,24,48V176a8,8,0,0,0,13,6.22L72,154V184a16,16,0,0,0,16,16h93.59L219,228.22A8,8,0,0,0,232,222V96A16,16,0,0,0,216,80ZM40,48H168V144H80a8,8,0,0,0-5,1.78L40,174.55ZM216,211.55l-29-21.77A8,8,0,0,0,182.21,188H88V160H168a16,16,0,0,0,16-16V96h32Z"/>
+                                </svg>
+                                <span class="side-menu__label">AI Assistant</span>
+                            </a>
+                        </li>
+                        <!-- End::slide AI Assistant -->
 
                         <!-- Start::slide Project Voice Assistant -->
                         <li class="slide">

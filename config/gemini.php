@@ -5,7 +5,7 @@ return [
     'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com'),
     'api_version' => env('GEMINI_API_VERSION', 'v1alpha'),
     'live_model' => env('GEMINI_LIVE_MODEL', 'gemini-2.0-flash-exp'),
-    'default_model' => env('GEMINI_DEFAULT_MODEL', env('GEMINI_MODEL', 'gemini-3.5-flash')),
+    'default_model' => env('GEMINI_DEFAULT_MODEL', env('GEMINI_MODEL', 'gemini-3.1-flash-lite')),
     'timeout' => (int) env('GEMINI_TIMEOUT', 60),
     'max_output_tokens' => (int) env('GEMINI_MAX_OUTPUT_TOKENS', 2048),
     'voice' => env('GEMINI_VOICE', 'Kore'),

@@ -1,6 +1,6 @@
 <?php
 return [
-    'name' => 'Quantum ARB',
-    'url'=>'https://qunatumarb.world/',
+    'name' => 'Demo',
+    'url'=> env('APP_URL', 'http://localhost'),
 
 ];

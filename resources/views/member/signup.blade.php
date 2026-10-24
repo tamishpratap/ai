@@ -16,7 +16,7 @@
         rel="stylesheet">
     <title>Sign Up | {{ config('detailsApp.name') }} </title>
 
-    <link rel="icon" type="image/png" href="{{ asset('mem_assets/images/favicon/favicon-96x96.png') }}" sizes="96x96" />
+    <link rel="icon" type="image/png" href="{{ asset('logo/favicon/favicon-96x96.png') }}" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="{{ asset('logo/favicon/favicon.svg') }}" />
     <link rel="shortcut icon" href="{{ asset('logo/favicon/favicon.ico') }}" />
     <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('logo/favicon/apple-touch-icon.png') }}" />
@@ -82,7 +82,7 @@
                             <div class="card-body">
                                 <div class="member-auth-head justify-content-center">
                                     <a href="{{ url('/member') }}">
-                                        <img src="{{ asset('logo/logo.png') }}" alt="logo" width="80px">
+                                        <img src="{{ asset('logo/logo.png') }}" alt="Demo" style="height: auto; max-width: 100px; object-fit: contain;">
                                     </a>
                                     <!--<span class="member-auth-icon"><i class="ti ti-user-plus"></i></span>-->
                                 </div>

@@ -2,14 +2,7 @@
 <footer class="footer">
     <div class="w-100 clearfix">
         <span class="text-center text-sm-left d-md-inline-block">
-            v3.1.0 {{ __('Copyright © '.date("Y"))}} <a href="https://arthemic.com">Arthemic</a> 
-            <i class="fa fa-heart text-danger"></i> 
-        </span>
-        <span class="float-none float-sm-right mt-1 mt-sm-0 text-center">
-            {{ __('Developed by')}} 
-            <a href="https://rakibul.dev" class="text-dark" target="_blank">
-                {{ __('Md. Rakibul Islam')}}
-            </a>
+            © {{ date('Y') }} Demo. All rights reserved.
         </span>
     </div>
 </footer>
@@ -132,5 +125,7 @@
 <script src="{{ asset('adm_assets/assets/plugins/jquery.repeater/jquery.repeater.min.js') }}"></script>
 <script src="{{ asset('adm_assets/assets/plugins/mohithg-switchery/dist/switchery.min.js') }}"></script>
 <script src="{{ asset('adm_assets/assets/js/form-advanced.js') }}"></script>
+<!-- IRA Voice Navigation Assistant Component -->
+<x-ira-assistant />
 </body>
 </html>

@@ -2,7 +2,7 @@
     <div class="sidebar-header">
         <a class="header-brand" href="{{ url('admin/dashboard') }}">
             <div class="logo-img text-center pl-4">
-                <img style="height: 60px; width:px;" class="header-brand-img ml-5" src="{{ asset('logo/logo.png') }}">
+                <img style="height: 48px; width: auto; max-width: 140px; object-fit: contain;" class="header-brand-img ml-5" src="{{ asset('logo/logo.png') }}" alt="Demo">
                 {{-- <span class="pt-5" style="font-size: 30px;margin: 10px;">RAISEON</span> --}}
             </div>
         </a>
@@ -20,6 +20,14 @@
             <nav id="main-menu-navigation" class="navigation-main">
                 <div class="nav-item {{ $segment1 == 'dashboard' ? 'active' : '' }} mt-4">
                     <a href="{{ url('admin/dashboard') }}"><i class="ik ik-bar-chart-2"></i><span>Dashboard</span></a>
+                </div>
+
+                <div class="nav-item">
+                    <a href="javascript:void(0);" class="ira-open-assistant-trigger" data-toggle="modal" data-target="#iraModal"><i class="ik ik-mic"></i><span>Navigation AI</span></a>
+                </div>
+
+                <div class="nav-item {{ request()->is('admin/ai/chat*') ? 'active' : '' }}">
+                    <a href="{{ url('admin/ai/chat') }}"><i class="ik ik-cpu"></i><span>AI Assistant</span></a>
                 </div>
 
                 <div class="nav-item {{ ($segment2 == 'popup-image' || $segment2 == 'achievers-images') ? 'active' : '' }}">

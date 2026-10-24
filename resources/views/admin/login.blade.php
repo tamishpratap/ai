@@ -38,7 +38,7 @@
                     <div class="authentication-form mx-auto mt-5">
                         <div class="logo-centered">
                             <a href="{{ url('/admin') }}">
-                                <img style="height: 120px; width: 150" src="{{ asset('logo/logo.png') }}"
+                                <img style="height: 60px; width: auto; max-width: 180px; object-fit: contain;" src="{{ asset('logo/logo.png') }}"
                                     alt="{{ config('detailsApp.name') }}">
                             </a>
                         </div>

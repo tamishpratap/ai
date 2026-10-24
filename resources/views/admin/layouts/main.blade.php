@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" >
 <head>
-	<title>@yield('title') | Admin</title>
+	<title>@yield('title') | {{ config('detailsApp.name', 'Demo') }} Admin</title>
 	<!-- initiate head with meta tags, css and script -->
 	@include('admin.include.head')
 
@@ -34,5 +34,7 @@
 
 	<!-- initiate scripts-->
 	@include('admin.include.script')	
+<!-- IRA Voice Navigation Assistant Component -->
+	<x-ira-assistant />
 </body>
 </html>
