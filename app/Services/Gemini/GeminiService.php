@@ -11,6 +11,49 @@ use RuntimeException;
 class GeminiService
 {
     /**
+     * Create an ephemeral live auth token for Gemini Live WebSocket session.
+     *
+     * @param  string|null  $apiKey
+     * @return array{token: string, expires_at: string, websocket_url: string, setup: array}
+     *
+     * @throws RuntimeException
+     */
+    public function createLiveToken(?string $apiKey = null): array
+    {
+        $resolvedKey = $this->resolveApiKey($apiKey);
+        $this->ensureConfigured($resolvedKey);
+
+        $now = now('UTC');
+        $expiresAt = $now->copy()->addMinutes(min(20, max(5, (int) config('gemini.live_session_minutes', 15))));
+
+        try {
+            $response = $this->client($resolvedKey)->post(
+                config('gemini.api_version', 'v1alpha').'/auth_tokens',
+                [
+                    'uses' => 1,
+                    'expireTime' => $expiresAt->toRfc3339String(),
+                    'newSessionExpireTime' => $now->copy()->addMinute()->toRfc3339String(),
+                ]
+            );
+        } catch (ConnectionException $exception) {
+            Log::warning('[GeminiService] Ephemeral token connection failed', ['exception' => $exception::class]);
+            throw new RuntimeException('AI voice service is temporarily unreachable.', 0, $exception);
+        }
+
+        if (! $response->successful() || blank($response->json('name'))) {
+            $this->logProviderFailure('live_token', $response->status(), $response->json('error.status'));
+            throw new RuntimeException($this->friendlyProviderError($response->status(), $response->json('error.status')));
+        }
+
+        return [
+            'token' => $response->json('name'),
+            'expires_at' => $expiresAt->toIso8601String(),
+            'websocket_url' => 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.'.config('gemini.api_version', 'v1alpha').'.GenerativeService.BidiGenerateContentConstrained',
+            'setup' => $this->liveSetup(),
+        ];
+    }
+
+    /**
      * Generate content via Google Generative Language API (Gemini).
      *
      * @param  array        $contents  Structured Gemini contents payload
@@ -74,6 +117,31 @@ class GeminiService
                 'output_tokens' => $response->json('usageMetadata.candidatesTokenCount'),
                 'total_tokens' => $response->json('usageMetadata.totalTokenCount'),
                 'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+            ],
+        ];
+    }
+
+    /**
+     * Live setup payload for bidirectional audio streaming.
+     */
+    public function liveSetup(): array
+    {
+        return [
+            'model' => 'models/'.config('gemini.live_model', 'gemini-2.0-flash-exp'),
+            'generationConfig' => [
+                'responseModalities' => ['AUDIO'],
+                'speechConfig' => [
+                    'voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => config('gemini.voice', 'Kore')]],
+                ],
+                'thinkingConfig' => ['thinkingLevel' => 'minimal'],
+            ],
+            'systemInstruction' => ['parts' => [['text' => $this->systemInstruction()]]],
+            'inputAudioTranscription' => new \stdClass,
+            'outputAudioTranscription' => new \stdClass,
+            'sessionResumption' => new \stdClass,
+            'contextWindowCompression' => [
+                'triggerTokens' => 25000,
+                'slidingWindow' => ['targetTokens' => 12000],
             ],
         ];
     }

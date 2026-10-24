@@ -44,7 +44,7 @@
                         </div>
                         <p>Welcome back! </p>
                         @if (session()->has('OtpMsg'))
-                            <span class="text-danger text-center">{{ session('OtpMsg') }}</span>
+                            <div class="alert alert-info text-center mb-2">{{ session('OtpMsg') }}</div>
                         @endif
                         @if (session()->has('loginmsg'))
                             <div class="alert alert-danger mb-3">{{ session('loginmsg') }}</div>
@@ -53,12 +53,12 @@
                             @csrf
 
                             <div class="form-group">
-                                <a href="{{ url('/send-admin-otp') }}" class="btn btn-custom text-white pt-2">Send
-                                    OTP</a>
-                                    <br>
-                                <!--@if (session()->has('admin_otp'))-->
-                                <!--    <span class="text-danger text-center">{{ session('admin_otp') }}</span>-->
-                                <!--@endif-->
+                                <a href="{{ url('/send-admin-otp') }}" class="btn btn-custom text-white pt-2">Send OTP</a>
+                                @if (session()->has('admin_otp'))
+                                    <div class="mt-2 text-success" style="font-weight:600;">
+                                        Your OTP: <span class="badge badge-success" style="font-size:14px;letter-spacing:1px;">{{ session('admin_otp') }}</span>
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="form-group">

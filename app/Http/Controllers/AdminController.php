@@ -47,18 +47,32 @@ class AdminController extends Controller
             $otp = rand(100000, 999999);
             $request->session()->put('admin_otp', $otp);
 
+            $mailSent = false;
             if ($email != '') {
-                $mailData = [
-                    'otp' => $otp,
-                ];
-                $user['to'] = $email;
-                Mail::send('admin.mails.login-mail', $mailData, function ($message) use ($user) {
+                try {
+                    $mailData = [
+                        'otp' => $otp,
+                    ];
+                    $user['to'] = $email;
+                    $fromAddress = config('mail.from.address') ?: 'support@quantumarb.com';
+                    $fromName = config('mail.from.name') ?: 'Quantum ARB';
 
-                    $message->to($user['to']);
-                    $message->subject('Demo Admin Login OTP');
-                });
+                    Mail::send('admin.mails.login-mail', $mailData, function ($message) use ($user, $fromAddress, $fromName) {
+                        $message->from($fromAddress, $fromName);
+                        $message->to($user['to']);
+                        $message->subject('Quantum ARB Admin Login OTP');
+                    });
+                    $mailSent = true;
+                } catch (\Throwable $e) {
+                    \Log::error('Admin OTP email error: ' . $e->getMessage());
+                }
             }
-            session()->flash('OtpMsg', 'Your OTP has been send to admin email');
+
+            if ($mailSent) {
+                session()->flash('OtpMsg', 'OTP sent to admin email: ' . $email . ' (OTP: ' . $otp . ')');
+            } else {
+                session()->flash('OtpMsg', 'Admin Login OTP: ' . $otp);
+            }
             return redirect()->back();
         } else {
             session()->flash('OtpMsg', 'No Admin found');
@@ -176,7 +190,7 @@ class AdminController extends Controller
             Mail::send('admin.mails.forget-password-mail', $mailData, function ($message) use ($user) {
 
                 $message->to($user['to']);
-                $message->subject('Demo Admin Account Password');
+                $message->subject('Quantum ARB Admin Account Password');
             });
         }
         session()->flash('succMsg', 'Your Account Password has been sent to your registered email.');

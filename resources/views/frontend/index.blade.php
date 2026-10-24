@@ -1381,6 +1381,8 @@
     <div class="max-w-[1280px] mx-auto px-5 h-[68px] flex items-center gap-6">
       <a href="#home" class="flex items-center shrink-0"><img class="logo" src="{{ asset('logo/logo.png') }}" alt="Demo" style="height: auto; max-height: 48px; object-fit: contain;"></a>
       <nav class="hidden lg:flex items-center gap-6 ml-2">
+        <a class="nlink" href="#ai-arsenal">AI Engines</a>
+        <a class="nlink flex items-center gap-1.5" href="{{ url('/ai/voice-assistant') }}" style="color:var(--green);font-weight:600;"><i class="fa-solid fa-microphone-lines"></i> Voice AI</a>
         <a class="nlink" href="#about">About</a>
         <a class="nlink" href="#business">Core Business</a>
         <a class="nlink" href="#income">Income</a>
@@ -1397,6 +1399,8 @@
     </div>
     <div class="mobmenu lg:hidden px-5 pb-4 flex-col gap-1" id="mob"
       style="background:rgba(5,7,10,.96);border-bottom:1px solid var(--line)">
+      <a class="nlink py-2.5 block" href="#ai-arsenal">AI Engines</a>
+      <a class="nlink py-2.5 block flex items-center gap-1.5" href="{{ url('/ai/voice-assistant') }}" style="color:var(--green);font-weight:600;"><i class="fa-solid fa-microphone-lines"></i> Voice AI Assistant</a>
       <a class="nlink py-2.5 block" href="#about">About</a><a class="nlink py-2.5 block" href="#business">Core
         Business</a>
       <a class="nlink py-2.5 block" href="#income">Income</a><a class="nlink py-2.5 block" href="#packages">Packages</a>
@@ -1497,6 +1501,232 @@
       </div>
     </div>
   </section>
+
+  <!-- ========================================================
+       NEON FLIP 3D CARDS (CODE LSD 3D CARD ANIMATION)
+       ======================================================== -->
+  <section id="ai-arsenal" class="sec" style="position:relative; z-index:10; background: transparent; padding: 50px 20px 80px;">
+    <style>
+      /* ===( CODE LSD )=== */
+      @import url("https://fonts.googleapis.com/css2?family=Nunito:wght@200;500;700;800;900;1000&display=swap");
+
+      #ai-arsenal * {
+        font-family: "Nunito", sans-serif;
+      }
+
+      #ai-arsenal .neon-header {
+        text-align: center;
+        max-width: 820px;
+        margin: 0 auto 10px;
+      }
+
+      #ai-arsenal .container-neon {
+        padding: 40px 0px 30px;
+        display: flex;
+        gap: 36px;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        max-width: 1380px;
+        margin: 0 auto;
+      }
+
+      #ai-arsenal .parent-link {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+      }
+
+      #ai-arsenal .parent {
+        height: 480px;
+        width: 380px;
+        max-width: calc(100vw - 40px);
+        padding: 20px;
+        perspective: 1100px;
+        cursor: pointer;
+      }
+
+      #ai-arsenal .card {
+        position: relative;
+        padding-top: 130px;
+        transform-style: preserve-3d;
+        background-image: url("https://images.pexels.com/photos/1629236/pexels-photo-1629236.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1");
+        background-position: center center;
+        width: 100%;
+        transition: all 0.5s ease-in-out;
+        border-radius: 12px;
+      }
+
+      #ai-arsenal .card:hover,
+      #ai-arsenal .parent:hover .card {
+        background-position: 80% 20%;
+        transform: rotate3d(0.5, 1, 0, 30deg);
+      }
+
+      #ai-arsenal .content-box {
+        height: 100%;
+        width: 100%;
+        background-color: rgba(0, 0, 0, 0.811);
+        border-radius: 0px 0px 12px 12px;
+        box-shadow: rgba(0, 115, 255, 0.925) 0px 20px 50px -25px;
+        transition: all 0.5s ease-in-out;
+        padding: 55px 28px 28px 28px;
+        transform-style: preserve-3d;
+      }
+
+      #ai-arsenal .card-title {
+        color: white;
+        font-size: 28px;
+        font-weight: 900;
+        transition: all 0.5s ease-in-out;
+        transform: translate3d(0px, 0px, 20px);
+      }
+
+      #ai-arsenal .card-title:hover,
+      #ai-arsenal .parent:hover .card-title {
+        transform: translate3d(0px, 0px, 50px);
+      }
+
+      #ai-arsenal .card-content {
+        padding-top: 16px;
+        font-size: 13.5px;
+        color: rgb(185, 185, 185);
+        transition: all 0.5s ease-in-out;
+        transform: translate3d(0px, 0px, 20px);
+        line-height: 1.6;
+      }
+
+      #ai-arsenal .card-content:hover,
+      #ai-arsenal .parent:hover .card-content {
+        transform: translate3d(0px, 0px, 50px);
+      }
+
+      #ai-arsenal .see-more {
+        display: block;
+        font-weight: 900;
+        font-size: 13px;
+        text-transform: uppercase;
+        color: rgb(0, 136, 255);
+        padding-top: 20px;
+        transition: all 0.5s ease-in-out;
+        transform: translate3d(0px, 0px, 20px);
+      }
+
+      #ai-arsenal .see-more:hover,
+      #ai-arsenal .parent:hover .see-more {
+        transform: translate3d(0px, 0px, 50px);
+      }
+
+      #ai-arsenal .date-box {
+        position: absolute;
+        top: 96px;
+        left: 28px;
+        height: 68px;
+        width: 68px;
+        background-color: black;
+        border-radius: 12px;
+        padding: 12px 6px;
+        box-shadow: rgb(0, 102, 255) 0px 20px 60px 0px, rgb(0, 200, 255) 0px 18px 36px -18px;
+        transform: translate3d(0px, 0px, 50px);
+      }
+
+      #ai-arsenal .date-box span {
+        display: block;
+        text-align: center;
+      }
+
+      #ai-arsenal .date-box .month {
+        color: white;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      #ai-arsenal .date-box .date {
+        font-size: 22px;
+        font-weight: 900;
+        color: rgb(0, 136, 255);
+      }
+
+      #ai-arsenal .card2 {
+        filter: hue-rotate(150deg);
+      }
+
+      #ai-arsenal .card3 {
+        filter: hue-rotate(300deg);
+      }
+    </style>
+
+    <div class="neon-header" data-aos="fade-up">
+      <div class="eyebrow"><i class="fa-solid fa-microchip"></i> QUANTUM AI TRADING ARSENAL</div>
+      <h2 class="h2">Autonomous <span class="gtext">3 AI Trading Engines</span></h2>
+      <p class="lead mx-auto mt-4">
+        Our proprietary three-tier artificial intelligence architecture is engineered to scan global liquidity, forecast order-book momentum, and execute risk-free arbitrage trades. Click any card to explore the dedicated engine.
+      </p>
+    </div>
+
+    <div class="container-neon" data-aos="fade-up" data-aos-delay="100">
+      
+      <!-- Card 1 (Blue) - Project AI Workspace -->
+      <a href="{{ url('/project-ai') }}" class="parent-link">
+        <div class="parent">
+          <div class="card">
+            <div class="content-box">
+              <h1 class="card-title">Chat Assistant</h1>
+              <p class="card-content">
+                Advanced generative AI workspace powered by Google Gemini. Formulate launch roadmaps, architect full-stack systems, code algorithms.
+              </p>
+              <span class="see-more">Launch Project AI</span>
+            </div>
+            <div class="date-box">
+              <span class="month">Project</span>
+              <span class="date">AI</span>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <!-- Card 2 (Red) - AI Voice Assistant -->
+      <a href="{{ url('/ai/voice-assistant') }}" class="parent-link">
+        <div class="parent card2">
+          <div class="card">
+            <div class="content-box">
+              <h1 class="card-title">AI Voice Assistant</h1>
+              <p class="card-content">
+                Real-time multilingual voice intelligence. Speak naturally to query your account data, live arbitrage trades, ROI tiers, capping rules, and platform analytics.
+              </p>
+              <span class="see-more">Launch Voice AI</span>
+            </div>
+            <div class="date-box">
+              <span class="month">Voice</span>
+              <span class="date">AI</span>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <!-- Card 3 (Green) - Plan Explainer AI -->
+      <a href="{{ url('/ai/plan-explainer') }}" class="parent-link" id="planExplainerAiCard" title="Launch Plan Explainer AI Voice Assistant">
+        <div class="parent card3">
+          <div class="card">
+            <div class="content-box">
+              <h1 class="card-title">Plan Explainer AI</h1>
+              <p class="card-content">
+                Real-time voice-powered compensation plan explainer. Speak naturally or ask anything about daily ROI tiers (1.5%–4%), 5% direct bonus, 20-level generation rewards, and 3X/5X capping booster.
+              </p>
+              <span class="see-more">Launch Plan Explainer</span>
+            </div>
+            <div class="date-box">
+              <span class="month">Plan</span>
+              <span class="date">AI</span>
+            </div>
+          </div>
+        </div>
+      </a>
+
+    </div>
+  </section>
+
+
 
   <!-- ABOUT -->
   <section id="about" class="sec">
@@ -2095,6 +2325,441 @@
       </div>
     </div>
   </footer>
+
+  <!-- ========================================================
+       QUANTUM ARB AI CHATBOT (THEME ACCORDING STYLES & INTERACTION)
+       ======================================================== -->
+  <style>
+    /* FLOATING TRIGGER BUTTON */
+    .chat-fab {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 9999;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--brand);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 32px rgba(43, 232, 107, 0.45), 0 0 20px rgba(43, 232, 107, 0.35);
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .chat-fab::after {
+      content: '';
+      position: absolute;
+      inset: -5px;
+      border-radius: 50%;
+      border: 2px solid rgba(43, 232, 107, 0.5);
+      animation: chatFabPulse 2.2s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
+      pointer-events: none;
+    }
+
+    @keyframes chatFabPulse {
+      0% { transform: scale(0.92); opacity: 1; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+
+    .chat-fab:hover {
+      transform: scale(1.1) translateY(-3px);
+      box-shadow: 0 12px 38px rgba(43, 232, 107, 0.65), 0 0 28px rgba(43, 232, 107, 0.5);
+    }
+
+    .chat-fab svg {
+      width: 26px;
+      height: 26px;
+      fill: #05070A;
+      transition: transform 0.3s ease;
+    }
+
+    .chat-fab:hover svg {
+      transform: scale(1.08);
+    }
+
+    .chat-fab.is-active svg {
+      transform: rotate(90deg);
+    }
+
+    /* CHAT CARD ASIDE */
+    .chat-card {
+      position: fixed;
+      bottom: 100px;
+      right: 28px;
+      z-index: 10000;
+      width: 390px;
+      max-width: calc(100vw - 36px);
+      height: 560px;
+      max-height: calc(100vh - 125px);
+      background: rgba(10, 16, 12, 0.94);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(43, 232, 107, 0.25);
+      border-radius: 20px;
+      box-shadow: 0 25px 65px rgba(0, 0, 0, 0.88), 0 0 45px rgba(43, 232, 107, 0.16);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(20px) scale(0.94);
+      transform-origin: bottom right;
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .chat-card.open,
+    .chat-card.is-open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+
+    .message.error .message-body {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 4px 16px 16px 16px;
+      color: #fca5a5;
+    }
+    .message.error .message-avatar {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    /* HEADER */
+    .chat-header {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(43, 232, 107, 0.16);
+      background: rgba(5, 7, 10, 0.65);
+    }
+
+    .chat-header p {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chat-header p::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+    }
+
+    .chat-header span {
+      display: block;
+      font-size: 12px;
+      color: var(--txt2);
+      margin-top: 3px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    #chatClose {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: var(--txt2);
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      transition: all 0.2s;
+    }
+
+    #chatClose:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      transform: scale(1.05);
+    }
+
+    /* MESSAGES */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+
+    .messages::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .messages::-webkit-scrollbar-thumb {
+      background: rgba(43, 232, 107, 0.25);
+      border-radius: 10px;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 88%;
+      animation: msgPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes msgPop {
+      0% { opacity: 0; transform: translateY(8px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+    }
+
+    .message.user {
+      align-self: flex-end;
+    }
+
+    .message-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 5px;
+    }
+
+    .message.user .message-meta {
+      justify-content: flex-end;
+    }
+
+    .message-avatar {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 10px;
+      letter-spacing: 0.05em;
+    }
+
+    .message.assistant .message-avatar {
+      background: var(--brand);
+      color: #05070A;
+    }
+
+    .message.user .message-avatar {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .message-label {
+      font-size: 11px;
+      color: var(--mut);
+    }
+
+    .message-body {
+      padding: 12px 15px;
+      font-size: 13.5px;
+      line-height: 1.55;
+    }
+
+    .message.assistant .message-body {
+      background: rgba(18, 183, 106, 0.1);
+      border: 1px solid rgba(43, 232, 107, 0.2);
+      border-radius: 4px 16px 16px 16px;
+      color: var(--txt);
+    }
+
+    .message.user .message-body {
+      background: linear-gradient(135deg, rgba(43, 232, 107, 0.22), rgba(18, 183, 106, 0.35));
+      border: 1px solid rgba(43, 232, 107, 0.45);
+      border-radius: 16px 4px 16px 16px;
+      color: #ffffff;
+    }
+
+    .message-body p {
+      margin: 0;
+    }
+
+    /* SUGGESTIONS */
+    .chat-suggestions {
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      background: rgba(5, 7, 10, 0.55);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .chat-suggestions::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chat-chip {
+      background: rgba(43, 232, 107, 0.08);
+      border: 1px solid rgba(43, 232, 107, 0.25);
+      color: var(--txt);
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 6px 13px;
+      border-radius: 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .chat-chip:hover {
+      background: rgba(43, 232, 107, 0.22);
+      border-color: var(--green);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    /* FORM */
+    .chat-form {
+      padding: 12px 16px 16px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: rgba(5, 7, 10, 0.75);
+      border-top: 1px solid rgba(43, 232, 107, 0.15);
+    }
+
+    #questionInput {
+      flex: 1;
+      height: 44px;
+      resize: none;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(43, 232, 107, 0.22);
+      border-radius: 12px;
+      color: var(--txt);
+      padding: 11px 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13.5px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    #questionInput:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 14px rgba(43, 232, 107, 0.25);
+    }
+
+    #sendButton {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--brand);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    #sendButton:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 16px rgba(43, 232, 107, 0.6);
+    }
+
+    #sendButton svg {
+      width: 18px;
+      height: 18px;
+      fill: #05070A;
+    }
+  </style>
+
+  <!-- FLOATING SIDE BUTTON -->
+  <button class="chat-fab" id="chatToggle" type="button" aria-label="Open PDF chat" title="Open AI Assistant">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 5.5A3.5 3.5 0 0 1 7.5 2h9A3.5 3.5 0 0 1 20 5.5v7A3.5 3.5 0 0 1 16.5 16h-5.1l-4.6 4.1A1.1 1.1 0 0 1 5 19.3V16.2A3.5 3.5 0 0 1 4 13.8z" />
+    </svg>
+  </button>
+
+  <!-- CHAT DRAWER ASIDE -->
+  <aside class="chat-card" id="chatCard" aria-label="Sentinel Guard AI Assistant" aria-hidden="true">
+    <header class="chat-header">
+      <div>
+        <p>Sentinel Guard AI</p>
+        <span id="chatStatus">● Autonomous Capital & Platform Intelligence</span>
+      </div>
+      <button id="chatClose" type="button" aria-label="Close chat">&times;</button>
+    </header>
+
+    <div class="messages" id="messages">
+      <article class="message assistant">
+        <div class="message-meta">
+          <span class="message-avatar">AI</span>
+          <span class="message-label">Sentinel AI Assistant</span>
+        </div>
+        <div class="message-body">
+          <p>Hello! I am your <strong>Sentinel Guard AI</strong> assistant. Ask me anything about our automated arbitrage scanner, anti-MEV front-running defense shield, ROI tiers, or project roadmap.</p>
+        </div>
+      </article>
+    </div>
+
+    <div class="chat-suggestions">
+      <button class="chat-chip" type="button" data-question="How does Sentinel Guard AI protect trades and prevent slippage?">Capital Protection</button>
+      <button class="chat-chip" type="button" data-question="What are the monthly ROI tiers and benefits?">ROI & Plans</button>
+      <button class="chat-chip" type="button" data-question="Explain Quantum Arbitrage in simple words.">Arbitrage Guide</button>
+    </div>
+
+    <form class="chat-form" id="chatForm">
+      <textarea id="questionInput" rows="2" placeholder="Ask Sentinel Guard AI anything..." aria-label="Question"></textarea>
+      <button id="sendButton" type="submit" aria-label="Send question">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3.7 20.3 21 12 3.7 3.7 3 10.3l10 1.7-10 1.7z" />
+        </svg>
+      </button>
+    </form>
+  </aside>
+
+  <!-- PDF CHATBOT SCRIPT (front_assets/script.js) -->
+  <script src="{{ asset('front_assets/script.js') }}"></script>
+
+  <script>
+    function openChatDrawer(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const chatToggle = document.getElementById('chatToggle');
+      const chatCard = document.getElementById('chatCard');
+      const questionInput = document.getElementById('questionInput');
+
+      if (chatCard) {
+        if (!chatCard.classList.contains('open')) {
+          if (chatToggle) {
+            chatToggle.click();
+          } else {
+            chatCard.classList.add('open');
+            chatCard.setAttribute('aria-hidden', 'false');
+          }
+        }
+        setTimeout(() => {
+          if (questionInput) questionInput.focus();
+        }, 260);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.open-ai-chat-trigger').forEach(el => {
+        el.addEventListener('click', openChatDrawer);
+      });
+    });
+  </script>
 
   <script>
       (function () {
