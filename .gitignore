@@ -21,3 +21,5 @@ yarn-error.log
 
 /public/assets/jarvis_intro.mp4
 /public/logo/bg1.mp4
+
+storage/framework/*.php
