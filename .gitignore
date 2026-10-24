@@ -18,3 +18,6 @@ yarn-error.log
 /.idea
 /.vscode
 /.claude
+
+/public/assets/jarvis_intro.mp4
+/public/logo/bg1.mp4
