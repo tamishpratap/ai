@@ -976,6 +976,18 @@
                         </li>
                         <!-- End::slide -->
 
+                        <!-- Start::slide Project Voice Assistant -->
+                        <li class="slide">
+                            <a href="{{ url('/member/ai/project-voice-assistant') }}" class="side-menu__item {{ request()->is('member/ai/project-voice-assistant*') ? 'active' : '' }}">
+                                <div class="side-menu__icon mt-1">
+                                    <i class="bx bx-bot" style="font-size: 20px; color: #00FF7F;"></i>
+                                </div>
+                                <span class="side-menu__label">Project Voice AI</span>
+                                <span class="badge bg-success-transparent ms-2" style="font-size: 10px; color: #00FF7F; border: 1px solid rgba(0,255,127,0.3); padding: 2px 6px; border-radius: 4px;">Live</span>
+                            </a>
+                        </li>
+                        <!-- End::slide -->
+
                         <!-- Start::slide -->
                         <li class="slide has-sub">
                             <a href="javascript:void(0);" class="side-menu__item">

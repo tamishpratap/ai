@@ -15,6 +15,20 @@ use App\Models\TicketText;
 use App\Models\UplineMember;
 use App\Models\WithdrawalRequest;
 
+if (!function_exists('mb_strimwidth')) {
+    function mb_strimwidth($string, $start, $width, $trimmarker = '', $encoding = 'UTF-8') {
+        $string = (string) $string;
+        if (strlen($string) <= $width) {
+            return $string;
+        }
+        $markerLen = strlen($trimmarker);
+        if ($width <= $markerLen) {
+            return substr($trimmarker, 0, $width);
+        }
+        return substr($string, $start, $width - $markerLen) . $trimmarker;
+    }
+}
+
 function userId()
 {
     $userid = "QRB" . rand(100000, 999999);
@@ -28,8 +42,11 @@ function userId()
 
 function getName($memberid)
 {
+    if (empty($memberid) || strtolower((string) $memberid) === 'root') {
+        return 'Root';
+    }
     $var = MemberDetail::where('memberid', $memberid)->first();
-    return $var['name'];
+    return $var ? ($var['name'] ?? 'Root') : 'Root';
 }
 
 function getAllData($memberid)
