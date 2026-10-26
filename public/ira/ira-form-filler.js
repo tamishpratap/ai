@@ -34,7 +34,7 @@
             defaultLocale: 'hi-IN',
             voiceRate: 1.0,
             voicePitch: 1.05,
-            silenceThresholdMs: 1800,
+            silenceThresholdMs: 1000,
             maxListeningDurationMs: 25000
         },
 
@@ -140,9 +140,12 @@
             // Mount form buttons for current page
             this.mountFormButtons();
 
-            // Also check again after DOM updates (for ajax-loaded forms)
-            setTimeout(() => this.mountFormButtons(), 800);
-            setTimeout(() => this.mountFormButtons(), 2000);
+            // Lightweight secondary check after DOM is fully interactive
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.mountFormButtons(), { once: true });
+            } else {
+                setTimeout(() => this.mountFormButtons(), 250);
+            }
 
             // Initialize isolated speech synthesis
             this.initSpeechSynthesis();
@@ -583,11 +586,17 @@
                 };
             }
 
-            // Bind Mic Toggle Button
+            // Bind Mic Toggle Button (with immediate speech cancel / barge-in)
             const micBtn = dock.querySelector('#iraFfMicBtn');
             if (micBtn) {
                 micBtn.onclick = (e) => {
                     e.preventDefault();
+                    if (this.isSpeaking) {
+                        try { window.speechSynthesis.cancel(); } catch (err) {}
+                        this.isSpeaking = false;
+                        this.startListening();
+                        return;
+                    }
                     if (this.isRecognitionRunning) {
                         this.stopListening();
                         this.setStatus('PAUSED');
@@ -900,7 +909,8 @@
 
         resetSilenceTimer: function () {
             this.clearSilenceTimer();
-            const threshold = this.config.silenceThresholdMs || 1800;
+            // Prioritize finalized transcript segments (900ms) over interim recognition (1000ms)
+            const threshold = this.sessionFinalTranscript ? 900 : (this.config.silenceThresholdMs || 1000);
             this.silenceTimer = setTimeout(() => {
                 if (this.isRecognitionRunning && !this.hasDispatchedTurn) {
                     this.stopListening();
@@ -1009,13 +1019,15 @@
                 return;
             }
 
-            // If active field is an identifier, apply dedicated identifier normalization
-            if (this.isIdentifierField(this.activeField)) {
+            // If speech is a compound or multi-field utterance, keep full text intact for backend semantic extraction
+            const isCompound = /\b(aur|and|transfer|amount|package|kar do|daal do|bhejo|bhejna|likho|select)\b/i.test(clean);
+
+            if (!isCompound && this.isIdentifierField(this.activeField)) {
                 const normId = this.normalizeIdentifier(clean);
                 if (normId) {
                     clean = normId;
                 }
-            } else if (this.activeField && ((this.activeField.type === 'number') || String(this.activeField.name || '').includes('amount'))) {
+            } else if (!isCompound && this.activeField && ((this.activeField.type === 'number') || String(this.activeField.name || '').includes('amount'))) {
                 // Normalize spoken numbers if Hindi or Roman Hindi amounts
                 clean = this.normalizeSpokenHindi(clean);
             }

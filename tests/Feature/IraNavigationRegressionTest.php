@@ -424,4 +424,42 @@ class IraNavigationRegressionTest extends TestCase
         $this->assertEquals('navigate', $result['intent']);
         $this->assertEquals('member_p2p_wallet', $result['destination_key']);
     }
+
+    /**
+     * Phase 3 Verification: P2P open command resolves to member P2P wallet.
+     */
+    public function test_phase3_p2p_open_phrase_resolves_to_p2p_wallet(): void
+    {
+        $result = $this->iraService->resolveIntent('P2P open karna hai', 'member');
+        $this->assertTrue($result['success']);
+        $this->assertEquals('navigate', $result['intent']);
+        $this->assertEquals('member_p2p_wallet', $result['destination_key']);
+    }
+
+    /**
+     * Phase 3 Verification: Explicit section request takes precedence over shorter page substring.
+     */
+    public function test_phase3_withdrawal_section_open_resolves_to_section_discovery(): void
+    {
+        $result = $this->iraService->resolveIntent('open the withdrawal section', 'member');
+        $this->assertTrue($result['success']);
+        $this->assertEquals('clarify', $result['intent']);
+        $this->assertTrue($result['needs_clarification']);
+        $this->assertEquals('withdrawal_section', $result['section_discovery']['section_key']);
+    }
+
+    /**
+     * Phase 3 Verification: Multi-turn section selection follow-up navigates accurately.
+     */
+    public function test_phase3_multiturn_section_followup_navigation(): void
+    {
+        $t1 = $this->iraService->resolveIntent('earning section dikhao', 'member');
+        $this->assertEquals('clarify', $t1['intent']);
+        $this->assertEquals('earnings', $t1['section_discovery']['section_key']);
+
+        $t2 = $this->iraService->resolveIntent('first option', 'member', '/member/dashboard', 'voice', $t1['context']);
+        $this->assertTrue($t2['success']);
+        $this->assertEquals('navigate', $t2['intent']);
+        $this->assertEquals('member_income_staking', $t2['destination_key']);
+    }
 }

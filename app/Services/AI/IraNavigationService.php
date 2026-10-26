@@ -5,6 +5,7 @@ namespace App\Services\AI;
 use App\Services\AI\AppNavigationOntology;
 use App\Services\AI\IraFormRegistry;
 use App\Services\AI\IraFormUnderstandingService;
+use App\Services\AI\NavigationGeminiBridge;
 use App\Services\Gemini\GeminiService;
 use Illuminate\Support\Facades\Log;
 
@@ -573,8 +574,10 @@ class IraNavigationService
 
     public function __construct(
         protected GeminiService $gemini,
-        protected ?IraFormUnderstandingService $formUnderstanding = null
+        protected ?IraFormUnderstandingService $formUnderstanding = null,
+        protected ?NavigationGeminiBridge $navGeminiBridge = null
     ) {
+        $this->navGeminiBridge = $this->navGeminiBridge ?? app(NavigationGeminiBridge::class);
         $this->destinations = AppNavigationOntology::getAllDestinations();
         $this->sidebarSections = AppNavigationOntology::getSidebarSections();
     }
@@ -668,8 +671,13 @@ class IraNavigationService
             }
         }
 
-        // 3. Gemini AI intent resolution fallback (preserved with strict role validation)
-        if ($this->gemini->isConfigured()) {
+        // 3. Dedicated Navigation Gemini Bridge (gemini-3.5-flash-lite)
+        if ($this->navGeminiBridge !== null && $this->navGeminiBridge->isConfigured()) {
+            $bridgeResult = $this->resolveWithNavigationBridge($clean, $role, $currentPage, $currentMode, $detectedLang, $context);
+            if ($bridgeResult !== null) {
+                return $bridgeResult;
+            }
+        } elseif ($this->gemini->isConfigured()) {
             $aiResult = $this->resolveWithGemini($clean, $role, $currentPage, $currentMode, $detectedLang, $context);
             if ($aiResult !== null) {
                 return $aiResult;
@@ -1229,20 +1237,24 @@ class IraNavigationService
         // Specific Registered Child Page Navigation via Ontology (Longest Alias Match First)
         $panelKey = ($role === 'admin') ? 'admin' : 'member';
         $pageMatch = AppNavigationOntology::findPageByAlias($clean, $panelKey);
-        if ($pageMatch !== null && $pageMatch['key'] !== 'member_dashboard' && $pageMatch['key'] !== 'admin_dashboard') {
-            return $this->resolveDestination($pageMatch['key'], $role, $lang);
+        if ($pageMatch !== null) {
+            if (($pageMatch['key'] === 'member_dashboard' || $pageMatch['key'] === 'admin_dashboard') && preg_match('/\b(?:messages?|image|popup)\b/iu', $clean)) {
+                // allow admin dashboard messages or popup image to be resolved specifically
+            } else {
+                return $this->resolveDestination($pageMatch['key'], $role, $lang);
+            }
         }
 
-        // Dashboard
-        if ((preg_match('/\b(?:dashboard|dash\s*board|main\s+dashboard)\b/iu', $clean) || preg_match('/(?:डैशबोर्ड)/u', $clean))
+        // Dashboard (with typo tolerance)
+        if ((preg_match('/\b(?:dashboard|dash\s*board|main\s+dashboard|dashbord|member\s+dashbord)\b/iu', $clean) || preg_match('/(?:डैशबोर्ड)/u', $clean))
             && !preg_match('/\b(?:messages?|image|popup)\b/iu', $clean)
             && !preg_match('/(?:मैसेज|इमेज|पॉपअप)/u', $clean)) {
             $dest = ($role === 'admin') ? 'admin_dashboard' : 'member_dashboard';
             return $this->resolveDestination($dest, $role, $lang);
         }
 
-        // Profile
-        if (preg_match('/\b(?:profile|my\s+profile|meri\s+profile|edit\s+profile)\b/iu', $clean)
+        // Profile (with typo tolerance)
+        if (preg_match('/\b(?:profile|my\s+profile|meri\s+profile|edit\s+profile|profiel|meri\s+profiel|my\s+profiel)\b/iu', $clean)
             || preg_match('/(?:प्रोफाइल|मेरी\s*प्रोफाइल)/u', $clean)) {
             $dest = ($role === 'admin') ? 'admin_profile' : 'member_profile_summary';
             return $this->resolveDestination($dest, $role, $lang);
@@ -1491,10 +1503,26 @@ class IraNavigationService
         // 3. Scan authorized panel sections and other panel sections using Unicode-safe ontology matching
         $match = AppNavigationOntology::findSectionByAlias($raw, $panelKey);
         $otherMatch = AppNavigationOntology::findSectionByAlias($raw, $otherPanelKey);
+        $thisPanelPageMatch = AppNavigationOntology::findPageByAlias($raw, $panelKey);
+        $otherPageMatch = AppNavigationOntology::findPageByAlias($raw, $otherPanelKey);
+
+        // 3b. When the user is NOT asking an exploratory section question (e.g. "member dashboard kholo", "mera profile open karo", "withdrawl page kholo"):
+        // Prioritize the authorized direct page match over section discovery UNLESS section match was strictly longer/more specific (e.g. "open the withdrawal section")
+        if (!$isSectionQuestion && $thisPanelPageMatch !== null && ($match === null || $thisPanelPageMatch['match_length'] >= $match['match_length'])) {
+            if ($otherPageMatch !== null && $otherPageMatch['match_length'] > $thisPanelPageMatch['match_length']) {
+                return $this->resolveDestination($otherPageMatch['key'], $role, $lang);
+            }
+            return $this->resolveDestination($thisPanelPageMatch['key'], $role, $lang);
+        }
+
+        // 3c. If other panel has a page match (e.g. 'Account Control') and this panel had none
+        if (!$isSectionQuestion && $otherPageMatch !== null) {
+            return $this->resolveDestination($otherPageMatch['key'], $role, $lang);
+        }
 
         // 4. If the other panel has a strictly longer/better match (e.g. 'Funds Management' (16) vs 'Funds' (5)),
         // or if authorized panel had no match at all, evaluate other panel section
-        if ($otherMatch !== null && ($match === null || $otherMatch['match_length'] > $match['match_length'])) {
+        if ($otherMatch !== null && ($match === null || $otherMatch['match_length'] > ($match['match_length'] ?? 0))) {
             if ($role === 'member') {
                 return [
                     'success' => false,
@@ -1510,21 +1538,6 @@ class IraNavigationService
                     'context' => [],
                 ];
             }
-        }
-
-        // 4b. If the other panel has a strictly longer matching page alias (e.g. 'Account Control' (15) vs 'Account' (7), 'Admin Dashboard' (15) vs 'Dashboard' (9))
-        $otherPageMatch = AppNavigationOntology::findPageByAlias($raw, $otherPanelKey);
-        if ($otherPageMatch !== null && ($match === null || $otherPageMatch['match_length'] > ($match['match_length'] ?? 0))) {
-            if ($role === 'member' || $role === 'guest') {
-                return $this->resolveDestination($otherPageMatch['key'], $role, $lang);
-            }
-        }
-
-        // 4c. If an authorized page has a strictly longer matching alias than the section match
-        // (e.g. 'petrol wallet' (13) vs 'wallet' (6) in withdrawal section), the user wants that specific page
-        $thisPanelPageMatch = AppNavigationOntology::findPageByAlias($raw, $panelKey);
-        if ($thisPanelPageMatch !== null && $thisPanelPageMatch['match_length'] > ($match['match_length'] ?? 0)) {
-            return $this->resolveDestination($thisPanelPageMatch['key'], $role, $lang);
         }
 
         if ($match !== null) {
@@ -1644,6 +1657,127 @@ class IraNavigationService
                 'pending_options' => $secData['pages'],
             ],
         ];
+    }
+
+    /**
+     * Resolve intent using dedicated NavigationGeminiBridge (gemini-3.5-flash-lite).
+     */
+    public function resolveWithNavigationBridge(
+        string $clean,
+        string $role,
+        string $currentPage,
+        string $currentMode,
+        string $lang,
+        array $context
+    ): ?array {
+        try {
+            if ($this->navGeminiBridge === null || !$this->navGeminiBridge->isConfigured()) {
+                return null;
+            }
+
+            $res = $this->navGeminiBridge->resolveIntent($clean, $role, $currentPage, $lang, $context);
+            if (!$res['success'] && in_array($res['status'], ['unconfigured', 'timeout', 'http_error', 'empty_speech', 'exception'], true)) {
+                return null; // Fall through gracefully to smart fallback
+            }
+
+            $intent = $res['intent'] ?? 'unsupported_action';
+            $destKey = $res['destination_key'] ?? null;
+            $speech = $res['speech'] ?? null;
+            $confidence = (float) ($res['confidence'] ?? 0.85);
+            $responseLang = $res['response_language'] ?? $lang;
+
+            // 1. Navigation Intent - Server Authoritative check
+            if ($intent === 'navigate' && $destKey !== null) {
+                if ($this->isDestinationAllowed($destKey, $role)) {
+                    $url = $this->getDestinationUrl($destKey);
+                    return [
+                        'success' => true,
+                        'intent' => 'navigate',
+                        'destination_key' => $destKey,
+                        'target_url' => $url,
+                        'speech' => $speech ?: $this->buildNavigationSpeech($destKey, $responseLang),
+                        'response_language' => $responseLang,
+                        'confidence' => $confidence,
+                        'needs_clarification' => false,
+                        'context' => [],
+                    ];
+                }
+
+                // If destination exists in app but not allowed for role -> unauthorized
+                if (isset($this->destinations[$destKey])) {
+                    return [
+                        'success' => false,
+                        'intent' => 'unauthorized',
+                        'destination_key' => null,
+                        'target_url' => null,
+                        'speech' => $speech ?: ($responseLang === 'english'
+                            ? "You do not have permission to access this section with your current account."
+                            : "Aapke paas is section ko access karne ki permission nahi hai."),
+                        'response_language' => $responseLang,
+                        'confidence' => 0.98,
+                        'needs_clarification' => false,
+                        'context' => [],
+                    ];
+                }
+            }
+
+            // 2. Clarification Intent
+            if ($intent === 'clarify') {
+                $options = is_array($res['options'] ?? null) ? $res['options'] : [];
+                return [
+                    'success' => true,
+                    'intent' => 'clarify',
+                    'destination_key' => null,
+                    'target_url' => null,
+                    'speech' => $speech ?: $this->buildSmartFallbackResponse($clean, $role, $currentPage, $responseLang)['speech'],
+                    'response_language' => $responseLang,
+                    'confidence' => $confidence,
+                    'needs_clarification' => true,
+                    'options' => $options,
+                    'context' => !empty($options) ? [
+                        'pending_clarification' => 'gemini_choice',
+                        'pending_options' => $options,
+                    ] : [],
+                ];
+            }
+
+            // 3. Unauthorized Intent
+            if ($intent === 'unauthorized') {
+                return [
+                    'success' => false,
+                    'intent' => 'unauthorized',
+                    'destination_key' => null,
+                    'target_url' => null,
+                    'speech' => $speech ?: ($responseLang === 'english'
+                        ? "This section is restricted to administrators only."
+                        : "Yeh section aapke account role ke liye permitted nahi hai."),
+                    'response_language' => $responseLang,
+                    'confidence' => max($confidence, 0.95),
+                    'needs_clarification' => false,
+                    'context' => [],
+                ];
+            }
+
+            // 4. Window Controls & History
+            if (in_array($intent, ['go_back', 'close_assistant', 'go_forward'], true)) {
+                return [
+                    'success' => true,
+                    'intent' => $intent,
+                    'destination_key' => null,
+                    'target_url' => null,
+                    'speech' => $speech ?: ($intent === 'close_assistant' ? 'Closing assistant window.' : 'Going back.'),
+                    'response_language' => $responseLang,
+                    'confidence' => $confidence,
+                    'needs_clarification' => false,
+                    'context' => [],
+                ];
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::warning('[IraNavigationService] Bridge exception note: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**

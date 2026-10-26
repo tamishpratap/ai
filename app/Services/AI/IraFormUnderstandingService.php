@@ -2,6 +2,7 @@
 
 namespace App\Services\AI;
 
+use App\Services\AI\FormGeminiBridge;
 use App\Services\Gemini\GeminiService;
 use Illuminate\Support\Facades\Log;
 
@@ -20,8 +21,11 @@ use Illuminate\Support\Facades\Log;
 class IraFormUnderstandingService
 {
     public function __construct(
-        protected GeminiService $gemini
-    ) {}
+        protected GeminiService $gemini,
+        protected ?FormGeminiBridge $formBridge = null
+    ) {
+        $this->formBridge = $formBridge ?? app(FormGeminiBridge::class);
+    }
 
     /**
      * Check if a field is sensitive (passwords, PINs, OTPs, CAPTCHAs, secrets, tokens).
@@ -92,7 +96,9 @@ class IraFormUnderstandingService
         array $fieldSequence,
         array $currentFields = [],
         array $excludeKeys = [],
-        ?array $domEligibleKeys = null
+        ?array $domEligibleKeys = null,
+        bool $isEditForm = false,
+        array $handledFields = []
     ): ?string {
         foreach ($fieldSequence as $k) {
             if (in_array($k, $excludeKeys, true)) {
@@ -117,9 +123,17 @@ class IraFormUnderstandingService
                     continue;
                 }
             }
-            // Is it unfilled in current DOM?
-            if (!isset($currentFields[$k]) || trim((string) $currentFields[$k]) === '') {
-                return $k;
+
+            if ($isEditForm) {
+                // In edit forms, fields not yet handled in this session are eligible
+                if (!in_array($k, $handledFields, true)) {
+                    return $k;
+                }
+            } else {
+                // In create forms, check if field is unfilled in current DOM
+                if (!isset($currentFields[$k]) || trim((string) $currentFields[$k]) === '') {
+                    return $k;
+                }
             }
         }
         return null;
@@ -257,6 +271,8 @@ class IraFormUnderstandingService
             ];
         }
 
+        $isEditForm = IraFormRegistry::isEditForm($schema);
+
         // 3. Determine filled fields from current DOM state
         $alreadyFilled = [];
         foreach ($eligibleKeys as $k) {
@@ -266,16 +282,22 @@ class IraFormUnderstandingService
             }
         }
 
-        // First target field: first unfilled field in eligible sequence, or first field
-        $firstKey = null;
-        foreach ($eligibleKeys as $k) {
-            if (!in_array($k, $alreadyFilled, true)) {
-                $firstKey = $k;
-                break;
-            }
-        }
-        if ($firstKey === null) {
+        // First target field:
+        if ($isEditForm) {
+            // For edit forms, always start with the first eligible field in sequence
             $firstKey = $eligibleKeys[0];
+        } else {
+            // For create forms, pick first unfilled field in eligible sequence, or first field
+            $firstKey = null;
+            foreach ($eligibleKeys as $k) {
+                if (!in_array($k, $alreadyFilled, true)) {
+                    $firstKey = $k;
+                    break;
+                }
+            }
+            if ($firstKey === null) {
+                $firstKey = $eligibleKeys[0];
+            }
         }
 
         $firstField = $schema['fields'][$firstKey];
@@ -284,12 +306,15 @@ class IraFormUnderstandingService
         $eligibleLabels = array_map(fn($f) => $f['label'], $eligibleFields);
         $labelsSummary = $this->formatFieldLabelsList($eligibleLabels);
 
+        $verbEn = $isEditForm ? 'edit' : 'fill';
+        $verbHinglish = $isEditForm ? 'edit karne' : 'bharne';
+
         if ($language === 'en') {
-            $stepA = "Certainly, I can help you fill the {$schema['title']} form. This form includes fields such as {$labelsSummary}. Let's start with {$firstField['label']}. ";
+            $stepA = "Certainly, I can help you {$verbEn} the {$schema['title']} form. This form includes fields such as {$labelsSummary}. Let's start with {$firstField['label']}. ";
         } elseif ($language === 'hinglish') {
-            $stepA = "Bilkul, main aapka {$schema['title']} form bharne mein help karti hoon. Ismein {$labelsSummary} jaise fields hain. Chaliye, pehle {$firstField['label']} se shuru karte hain. ";
+            $stepA = "Bilkul, main aapka {$schema['title']} form {$verbHinglish} mein help karti hoon. Ismein {$labelsSummary} jaise fields hain. Chaliye, pehle {$firstField['label']} se shuru karte hain. ";
         } else {
-            // Hindi default (preserves 'Create Investment / Staking' and 'शुरू करते हैं' for existing test assertions)
+            // Hindi default (preserves 'भरने में मदद करती हूँ' for existing test assertions)
             $stepA = "बिल्कुल, मैं आपका {$schema['title']} form भरने में मदद करती हूँ। इसमें {$labelsSummary} जैसे fields हैं। चलिए, पहले {$firstField['label']} से शुरू करते हैं। ";
         }
 
@@ -309,6 +334,8 @@ class IraFormUnderstandingService
                 'current_field' => $firstKey,
                 'field_sequence' => $eligibleKeys,
                 'filled_fields' => $alreadyFilled,
+                'handled_fields' => [],
+                'is_edit_form' => $isEditForm,
                 'step_index' => array_search($firstKey, $eligibleKeys, true) ?: 0,
                 'language' => $language,
             ],
@@ -454,51 +481,86 @@ class IraFormUnderstandingService
             }
         }
 
-        // 6. Check for Specific Field Switch Command ("Mobile Number दोबारा बदलो", "Country change karo", "Amount badal do")
-        $changeKeywords = '(?:badlo|change|dobara|wapas|update|phir\s*se|modify|दोबारा\s*बदलो|दोबारा|बदलो|बदल\s*दो)';
-        foreach ($schema['fields'] as $k => $f) {
-            if ($this->isSensitiveField($f) || $this->isReadOnlyOrHiddenField($f) || ($f['file_upload'] ?? false)) {
-                continue;
-            }
-            $fLabel = mb_strtolower($f['label']);
-            $fName = mb_strtolower($f['name']);
-            $aliases = array_map('mb_strtolower', $f['aliases'] ?? []);
-            $patterns = array_merge([$fLabel, $fName], $aliases);
+        // Active field and context setup
+        $domEligibleKeys = $context['dom_eligible_fields'] ?? ($guideState['dom_eligible_fields'] ?? null);
+        if ($domEligibleKeys !== null) {
+            $guideState['dom_eligible_fields'] = $domEligibleKeys;
+        }
 
-            foreach ($patterns as $pat) {
-                if (mb_strlen($pat) >= 3 && (
-                    preg_match('/(?:^|\s)' . preg_quote($pat, '/') . '.*?' . $changeKeywords . '(?:$|\s)/iu', $clean) ||
-                    preg_match('/(?:^|\s)' . $changeKeywords . '.*?' . preg_quote($pat, '/') . '(?:$|\s)/iu', $clean)
-                )) {
-                    $guideState['current_field'] = $k;
-                    $guideState['step_index'] = array_search($k, $guideState['field_sequence'] ?? []) ?: 0;
-                    $guideState['filled_fields'] = array_values(array_diff($guideState['filled_fields'] ?? [], [$k]));
-                    $q = $this->getFieldPromptQuestion($f, $schema);
+        $isEditForm = $guideState['is_edit_form'] ?? IraFormRegistry::isEditForm($schema);
+        $guideState['is_edit_form'] = $isEditForm;
+        $handledFields = $guideState['handled_fields'] ?? ($guideState['filled_fields'] ?? []);
+
+        // 6. Check for Skip / Keep Existing Command ("skip", "same rehne do", "keep existing", "wahi rehne do", "badalna nahi hai")
+        $isSkipCommand = preg_match('/\b(skip|same\s*rehne\s*do|keep\s*existing|wahi\s*rehne\s*do|badalna\s*nahi\s*hai|isse\s*mat\s*badlo|koi\s*change\s*nahi|no\s*change|aage\s*badho|next|skip\s*karo)\b/iu', $norm) ||
+            preg_match('/(?:वही\s*रहने\s*दो|बदलना\s*नहीं\s*है|कोई\s*बदलाव\s*नहीं|स्किप|आगे\s*बढ़ो)/u', $clean);
+        if ($isSkipCommand) {
+            $currentFieldKey = $guideState['current_field'] ?? ($guideState['field_sequence'][0] ?? null);
+            $activeFieldDef = $currentFieldKey ? ($schema['fields'][$currentFieldKey] ?? null) : null;
+            if ($activeFieldDef) {
+                $handledFields = array_unique(array_merge($handledFields, [$currentFieldKey]));
+                $guideState['handled_fields'] = $handledFields;
+
+                $fieldSequence = $guideState['field_sequence'] ?? array_keys($schema['fields']);
+                $nextFieldKey = $this->findNextEligibleField(
+                    $schema,
+                    $fieldSequence,
+                    $currentFields,
+                    [$currentFieldKey],
+                    $domEligibleKeys,
+                    $isEditForm,
+                    $handledFields
+                );
+
+                if ($nextFieldKey !== null) {
+                    $nextFieldDef = $schema['fields'][$nextFieldKey];
+                    $nextQuestion = $this->getFieldPromptQuestion($nextFieldDef, $schema, $language);
+                    if ($language === 'en') {
+                        $speech = "Kept {$activeFieldDef['label']} as is. Now please specify the {$nextQuestion}";
+                    } elseif ($language === 'hinglish') {
+                        $speech = "Theek hai, {$activeFieldDef['label']} wahi rahega. Ab {$nextQuestion}";
+                    } else {
+                        $speech = "ठीक है, {$activeFieldDef['label']} वही रहेगा। अब {$nextQuestion}";
+                    }
+
+                    $guideState['current_field'] = $nextFieldKey;
+                    $guideState['step_index'] = array_search($nextFieldKey, $fieldSequence, true) ?: 0;
+
                     return [
                         'success' => true,
-                        'status' => 'switch_field',
+                        'status' => 'field_skipped',
                         'action' => 'prompt',
-                        'speech' => "ठीक है, {$f['label']} को दोबारा बदलते हैं। {$q}",
+                        'speech' => $speech,
                         'form_key' => $formKey,
                         'form_selector' => $schema['selector'],
                         'guide_state' => $guideState,
                         'active_field' => [
-                            'key' => $k,
-                            'name' => $f['name'],
-                            'selector' => $f['selector'],
-                            'label' => $f['label'],
-                            'type' => $f['type'],
+                            'key' => $nextFieldKey,
+                            'name' => $nextFieldDef['name'],
+                            'selector' => $nextFieldDef['selector'],
+                            'label' => $nextFieldDef['label'],
+                            'type' => $nextFieldDef['type'],
                         ],
                         'form_updates' => [],
                     ];
                 }
+
+                return $this->buildCompletionPayload($schema, $currentFields, $guideState, []);
             }
         }
 
-        // Active field from guide state (with DOM and sensitivity validation)
-        $domEligibleKeys = $context['dom_eligible_fields'] ?? ($guideState['dom_eligible_fields'] ?? null);
-        if ($domEligibleKeys !== null) {
-            $guideState['dom_eligible_fields'] = $domEligibleKeys;
+        // 7. Check for Direct Field Targeting & Specific Field Switch Commands
+        $directTargetingResult = $this->resolveDirectFieldTargeting(
+            $clean,
+            $norm,
+            $schema,
+            $currentFields,
+            $guideState,
+            $language,
+            $domEligibleKeys
+        );
+        if ($directTargetingResult !== null) {
+            return $directTargetingResult;
         }
 
         $currentFieldKey = $guideState['current_field'] ?? ($guideState['field_sequence'][0] ?? null);
@@ -517,7 +579,9 @@ class IraFormUnderstandingService
                 $guideState['field_sequence'] ?? array_keys($schema['fields']),
                 $currentFields,
                 [],
-                $domEligibleKeys
+                $domEligibleKeys,
+                $isEditForm,
+                $handledFields
             );
             $activeFieldDef = $currentFieldKey ? ($schema['fields'][$currentFieldKey] ?? null) : null;
             if ($currentFieldKey) {
@@ -587,7 +651,79 @@ class IraFormUnderstandingService
             }
         }
 
-        // Step E: If neither targeted nor general extraction could resolve the value:
+        // Tier 2: Dedicated Gemini Semantic Fallback if deterministic extraction could not resolve
+        if ($extracted === null && $this->formBridge->isConfigured()) {
+            $aiResult = $this->formBridge->extractFieldValues($clean, $schema, $currentFields, $currentFieldKey, $context);
+            if ($aiResult['success'] && !empty($aiResult['updates'])) {
+                $aiUpdates = [];
+                foreach ($aiResult['updates'] as $fKey => $fVal) {
+                    if (isset($schema['fields'][$fKey])) {
+                        $fDef = $schema['fields'][$fKey];
+                        if (!$this->isSensitiveField($fDef) && !$this->isReadOnlyOrHiddenField($fDef) && !($fDef['file_upload'] ?? false)) {
+                            $dispVal = (string) $fVal;
+                            $spokenVal = $this->formatSpokenValue($dispVal, $fDef, $language);
+                            $aiUpdates[$fKey] = [
+                                'field' => $fKey,
+                                'name' => $fDef['name'],
+                                'selector' => $fDef['selector'],
+                                'value' => $fVal,
+                                'display_value' => $dispVal,
+                                'spoken_value' => $spokenVal,
+                                'label' => $fDef['label'],
+                                'type' => $fDef['type'],
+                                'events' => $fDef['dynamic_events'] ?? ['input', 'change'],
+                            ];
+                        }
+                    }
+                }
+
+                if (!empty($aiUpdates)) {
+                    $isCorrectionUtterance = $aiResult['is_correction'] || $isCorrectionUtterance;
+                    if (isset($aiUpdates[$currentFieldKey])) {
+                        $updatedFieldKey = $currentFieldKey;
+                        $updatedFieldDef = $activeFieldDef;
+                        $extracted = [
+                            'value' => $aiUpdates[$currentFieldKey]['value'],
+                            'display_value' => $aiUpdates[$currentFieldKey]['display_value'],
+                            'is_correction' => $isCorrectionUtterance,
+                        ];
+                    } else {
+                        $firstAiKey = array_key_first($aiUpdates);
+                        $updatedFieldKey = $firstAiKey;
+                        $updatedFieldDef = $schema['fields'][$firstAiKey] ?? $activeFieldDef;
+                        $extracted = [
+                            'value' => $aiUpdates[$firstAiKey]['value'],
+                            'display_value' => $aiUpdates[$firstAiKey]['display_value'],
+                            'is_correction' => $isCorrectionUtterance,
+                        ];
+                    }
+                    $otherUpdates = $aiUpdates;
+                }
+            }
+        }
+
+        // If targeted extraction succeeded, also check if user supplied other eligible fields in the same compound sentence
+        if ($extracted !== null && empty($otherUpdates)) {
+            $generalCheck = $this->extractFieldsDeterministic($clean, $schema, $currentFields);
+            if (!empty($generalCheck['updates']) && count($generalCheck['updates']) > 1) {
+                $merged = $generalCheck['updates'];
+                $valDisplay = $extracted['display_value'] ?? (string) $extracted['value'];
+                $merged[$updatedFieldKey] = [
+                    'field' => $updatedFieldKey,
+                    'name' => $updatedFieldDef['name'],
+                    'selector' => $updatedFieldDef['selector'],
+                    'value' => $extracted['value'],
+                    'display_value' => $valDisplay,
+                    'spoken_value' => $this->formatSpokenValue($valDisplay, $updatedFieldDef, $language),
+                    'label' => $updatedFieldDef['label'],
+                    'type' => $updatedFieldDef['type'],
+                    'events' => $updatedFieldDef['dynamic_events'] ?? ['input', 'change'],
+                ];
+                $otherUpdates = $merged;
+            }
+        }
+
+        // Step E: If neither targeted, general deterministic, nor Gemini extraction could resolve the value:
         // KEEP current_field ACTIVE! Do NOT give generic apologies or lose state!
         if ($extracted === null) {
             $clarificationSpeech = $this->buildFieldClarificationSpeech($activeFieldDef, $language);
@@ -631,9 +767,15 @@ class IraFormUnderstandingService
             ]
         ];
 
-        // Update currentFields map
-        $currentFields[$updatedFieldKey] = $val;
-        $filledFields = array_unique(array_merge($guideState['filled_fields'] ?? [], [$updatedFieldKey]));
+        // Update currentFields and filled_fields for ALL resolved updates
+        $updatedKeys = array_keys($updates);
+        foreach ($updates as $upKey => $upData) {
+            $currentFields[$upKey] = $upData['value'];
+        }
+        $filledFields = array_unique(array_merge($guideState['filled_fields'] ?? [], $updatedKeys));
+        $guideState['filled_fields'] = $filledFields;
+        $handledFields = array_unique(array_merge($handledFields, $updatedKeys));
+        $guideState['handled_fields'] = $handledFields;
 
         // Validate warnings (e.g. Staking limits)
         $warnings = [];
@@ -648,14 +790,16 @@ class IraFormUnderstandingService
             }
         }
 
-        // Determine NEXT field in field_sequence
+        // Determine NEXT field in field_sequence past all updated keys
         $fieldSequence = $guideState['field_sequence'] ?? array_keys($schema['fields']);
         $nextFieldKey = $this->findNextEligibleField(
             $schema,
             $fieldSequence,
             $currentFields,
-            [$updatedFieldKey],
-            $domEligibleKeys
+            $updatedKeys,
+            $domEligibleKeys,
+            $isEditForm,
+            $handledFields
         );
 
         // If there is another field to ask:
@@ -664,40 +808,57 @@ class IraFormUnderstandingService
             $nextQuestion = $this->getFieldPromptQuestion($nextFieldDef, $schema, $language);
 
             // Step D: Confirm and move to next field naturally and politely
-            if ($language === 'en') {
-                if ($isCorrection) {
-                    $confirm = "All right, {$updatedFieldDef['label']} has been changed to {$spokenVal}.";
-                } elseif ($updatedFieldDef['type'] === 'select' || $updatedFieldDef['type'] === 'radio') {
-                    $confirm = "{$updatedFieldDef['label']} has been selected as {$spokenVal}.";
-                } elseif ($updatedFieldDef['type'] === 'checkbox') {
-                    $confirm = "{$updatedFieldDef['label']} has been checked.";
-                } else {
-                    $confirm = "Thank you, {$updatedFieldDef['label']} has been set to {$spokenVal}.";
+            if (count($updates) > 1) {
+                $labelsWithVals = [];
+                foreach ($updates as $u) {
+                    $labelsWithVals[] = "{$u['label']}: {$u['display_value']}";
                 }
-                $speech = "{$confirm} Now please specify the {$nextQuestion}";
-            } elseif ($language === 'hinglish') {
-                if ($isCorrection) {
-                    $confirm = "Theek hai, {$updatedFieldDef['label']} ko badal kar {$spokenVal} kar diya hai.";
-                } elseif ($updatedFieldDef['type'] === 'select' || $updatedFieldDef['type'] === 'radio') {
-                    $confirm = "{$updatedFieldDef['label']} mein {$spokenVal} select kiya gaya hai.";
-                } elseif ($updatedFieldDef['type'] === 'checkbox') {
-                    $confirm = "{$updatedFieldDef['label']} check kiya gaya hai.";
+                if ($language === 'en') {
+                    $confirm = "Recorded " . implode(', ', $labelsWithVals) . ".";
+                    $speech = "{$confirm} Now please specify the {$nextQuestion}";
+                } elseif ($language === 'hinglish') {
+                    $confirm = "Maine " . implode(', ', $labelsWithVals) . " bhar diya hai.";
+                    $speech = "{$confirm} Ab {$nextQuestion}";
                 } else {
-                    $confirm = "Dhanyavaad, {$updatedFieldDef['label']} mein {$spokenVal} bhar diya hai.";
+                    $confirm = "मैंने " . implode(', ', $labelsWithVals) . " भर दिया है।";
+                    $speech = "{$confirm} अब {$nextQuestion}";
                 }
-                $speech = "{$confirm} Ab {$nextQuestion}";
             } else {
-                // Hindi default
-                if ($isCorrection) {
-                    $confirm = "ठीक है, {$updatedFieldDef['label']} को बदल कर {$spokenVal} कर दिया है।";
-                } elseif ($updatedFieldDef['type'] === 'select' || $updatedFieldDef['type'] === 'radio') {
-                    $confirm = "{$updatedFieldDef['label']} में {$spokenVal} select किया गया है।";
-                } elseif ($updatedFieldDef['type'] === 'checkbox') {
-                    $confirm = "{$updatedFieldDef['label']} check किया गया है।";
+                if ($language === 'en') {
+                    if ($isCorrection) {
+                        $confirm = "All right, {$updatedFieldDef['label']} has been changed to {$spokenVal}.";
+                    } elseif ($updatedFieldDef['type'] === 'select' || $updatedFieldDef['type'] === 'radio') {
+                        $confirm = "{$updatedFieldDef['label']} has been selected as {$spokenVal}.";
+                    } elseif ($updatedFieldDef['type'] === 'checkbox') {
+                        $confirm = "{$updatedFieldDef['label']} has been checked.";
+                    } else {
+                        $confirm = "Thank you, {$updatedFieldDef['label']} has been set to {$spokenVal}.";
+                    }
+                    $speech = "{$confirm} Now please specify the {$nextQuestion}";
+                } elseif ($language === 'hinglish') {
+                    if ($isCorrection) {
+                        $confirm = "Theek hai, {$updatedFieldDef['label']} ko badal kar {$spokenVal} kar diya hai.";
+                    } elseif ($updatedFieldDef['type'] === 'select' || $updatedFieldDef['type'] === 'radio') {
+                        $confirm = "{$updatedFieldDef['label']} mein {$spokenVal} select kiya gaya hai.";
+                    } elseif ($updatedFieldDef['type'] === 'checkbox') {
+                        $confirm = "{$updatedFieldDef['label']} check kiya gaya hai.";
+                    } else {
+                        $confirm = "Dhanyavaad, {$updatedFieldDef['label']} mein {$spokenVal} bhar diya hai.";
+                    }
+                    $speech = "{$confirm} Ab {$nextQuestion}";
                 } else {
-                    $confirm = "धन्यवाद, {$updatedFieldDef['label']} में {$spokenVal} भर दिया है।";
+                    // Hindi default
+                    if ($isCorrection) {
+                        $confirm = "ठीक है, {$updatedFieldDef['label']} को बदल कर {$spokenVal} कर दिया है।";
+                    } elseif ($updatedFieldDef['type'] === 'select' || $updatedFieldDef['type'] === 'radio') {
+                        $confirm = "{$updatedFieldDef['label']} में {$spokenVal} select किया गया है।";
+                    } elseif ($updatedFieldDef['type'] === 'checkbox') {
+                        $confirm = "{$updatedFieldDef['label']} check किया गया है।";
+                    } else {
+                        $confirm = "धन्यवाद, {$updatedFieldDef['label']} में {$spokenVal} भर दिया है।";
+                    }
+                    $speech = "{$confirm} अब {$nextQuestion}";
                 }
-                $speech = "{$confirm} अब {$nextQuestion}";
             }
             if (!empty($warnings)) {
                 $speech = implode(' ', $warnings) . ' ' . $speech;
@@ -705,6 +866,7 @@ class IraFormUnderstandingService
 
             $guideState['current_field'] = $nextFieldKey;
             $guideState['filled_fields'] = $filledFields;
+            $guideState['handled_fields'] = $handledFields;
             $guideState['step_index'] = array_search($nextFieldKey, $fieldSequence, true) ?: 0;
             $guideState['status'] = 'in_progress';
 
@@ -752,19 +914,23 @@ class IraFormUnderstandingService
 
         // 1. NUMBER FIELD
         if ($type === 'number' || str_contains($name, 'amount') || str_contains($label, 'amount')) {
-            // Check for correction pattern: e.g. "nahi 2000 nahi 2500" or "galat 2500 karo"
-            if (preg_match('/\b(nahi|not|galat|badal|change|balki|नहीं)\b/iu', $rawSpeech)) {
-                $normDigits = IraTextNormalizer::convertDevanagariDigits($rawSpeech);
-                preg_match_all('/(?:\$|rs|inr|₹)?\s*([\d,]+(?:\.\d+)?)/i', $normDigits, $mAll);
-                if (!empty($mAll[1]) && count($mAll[1]) >= 2) {
-                    $lastRaw = end($mAll[1]);
-                    $num = (float) str_replace(',', '', $lastRaw);
-                    return [
-                        'value' => $num,
-                        'display_value' => (string) $num,
-                        'is_correction' => true,
-                    ];
+            // Check for correction pattern: e.g. "nahi 2000 nahi 2500", "pehle 1000 tha ab 2000 kar do", "galat 2500 karo"
+            $hasContrastKeywords = preg_match('/\b(nahi|not|galat|badal|change|balki|नहीं|pehle|ab|ki\s*jagah|instead\s*of)\b/iu', $rawSpeech);
+            $normDigits = IraTextNormalizer::convertDevanagariDigits($rawSpeech);
+            preg_match_all('/(?:\$|rs|inr|₹)?\s*([\d,]+(?:\.\d+)?)/i', $normDigits, $mAll);
+            $hasMultipleNumbers = !empty($mAll[1]) && count($mAll[1]) >= 2;
+
+            if ($hasContrastKeywords && $hasMultipleNumbers) {
+                if ($this->formBridge->isConfigured()) {
+                    return null;
                 }
+                $lastRaw = end($mAll[1]);
+                $num = (float) str_replace(',', '', $lastRaw);
+                return [
+                    'value' => $num,
+                    'display_value' => (string) $num,
+                    'is_correction' => true,
+                ];
             }
 
             // Normal numeric extraction with IraTextNormalizer (handles "एक हजार पांच सौ" -> 1500, "बारह हजार" -> 12000, "९८७६५" -> 98765)
@@ -870,6 +1036,24 @@ class IraFormUnderstandingService
 
         // 6. MEMBER ID / USER ID / SPONSOR ID / ALPHANUMERIC IDENTIFIERS
         if (IraTextNormalizer::isIdentifierField($fieldDef)) {
+            $memId = $this->extractMemberId($normSpeech, $fieldDef);
+            if ($memId !== null) {
+                return [
+                    'value' => $memId['value'],
+                    'display_value' => $memId['display_value'],
+                    'is_identifier' => true,
+                ];
+            }
+
+            if (preg_match('/\b([A-Za-z]{2,4}\d{4,8})\b/', $rawSpeech, $mId)) {
+                $id = strtoupper($mId[1]);
+                return [
+                    'value' => $id,
+                    'display_value' => $id,
+                    'is_identifier' => true,
+                ];
+            }
+
             $id = IraTextNormalizer::normalizeIdentifier($rawSpeech);
             if ($id !== null && !in_array(strtolower($id), ['cancel', 'stop', 'help', 'exit', 'next', 'back', 'form'])) {
                 return [
@@ -891,8 +1075,8 @@ class IraFormUnderstandingService
         // 8. NAME FIELD (Full Name, Account Holder Name, etc.)
         $isName = str_contains($name, 'name') || str_contains($label, 'name');
         if ($isName) {
-            $cleanVal = preg_replace('/^(?:likho|daalo|bharo|naam|hai|yeh\s*hai|mera|meri|kripya)\s+/iu', '', $rawSpeech);
-            $cleanVal = preg_replace('/\s+(?:likho|daalo|karo|bharo|kardo|rakho|hoga)$/iu', '', $cleanVal);
+            $cleanVal = preg_replace('/^(?:likho|daalo|bharo|naam|name|poora\s*naam|hai|yeh\s*hai|mera|meri|kripya|please)\s*(?:mein|me|ko|change\s*karke|badal\s*kar|to|as|[:=])?\s*/iu', '', $rawSpeech);
+            $cleanVal = preg_replace('/\s*(?:likho|daalo|karo|bharo|kardo|kar\s*do|kar\s*de|kar\s*dijiye|kijiye|rakho|rakh\s*do|set\s*karo|set\s*kardo|set\s*kar\s*do|hoga|hai)$/iu', '', $cleanVal);
             $cleanVal = trim($cleanVal);
             if (mb_strlen($cleanVal) >= 1) {
                 $romanName = IraTextNormalizer::transliterate($cleanVal, true);
@@ -905,8 +1089,8 @@ class IraFormUnderstandingService
 
         // 9. COUNTRY FIELD (if text input rather than select)
         if (str_contains($name, 'country') || str_contains($label, 'country')) {
-            $cleanVal = preg_replace('/^(?:likho|daalo|bharo|country|hai|yeh\s*hai|mera|meri|kripya)\s+/iu', '', $rawSpeech);
-            $cleanVal = preg_replace('/\s+(?:likho|daalo|karo|bharo|kardo|rakho|hoga)$/iu', '', $cleanVal);
+            $cleanVal = preg_replace('/^(?:likho|daalo|bharo|country|desh|nation|videsh|hai|yeh\s*hai|mera|meri|kripya|please)\s*(?:mein|me|ko|change\s*karke|badal\s*kar|to|as|[:=])?\s*/iu', '', $rawSpeech);
+            $cleanVal = preg_replace('/\s*(?:likho|daalo|karo|bharo|kardo|kar\s*do|kar\s*de|kar\s*dijiye|kijiye|rakho|rakh\s*do|set\s*karo|set\s*kardo|set\s*kar\s*do|hoga|hai)$/iu', '', $cleanVal);
             $cleanVal = trim($cleanVal);
             if (mb_strlen($cleanVal) >= 1) {
                 $country = IraTextNormalizer::transliterate($cleanVal);
@@ -918,8 +1102,8 @@ class IraFormUnderstandingService
         }
 
         // 10. GENERIC TEXT / TEXTAREA / MESSAGE
-        $cleanVal = preg_replace('/^(?:likho|daalo|bharo|naam|hai|yeh\s*hai|mera|meri|kripya)\s+/iu', '', $rawSpeech);
-        $cleanVal = preg_replace('/\s+(?:likho|daalo|karo|bharo|kardo|rakho|hoga)$/iu', '', $cleanVal);
+        $cleanVal = preg_replace('/^(?:likho|daalo|bharo|naam|hai|yeh\s*hai|mera|meri|kripya|please)\s*(?:mein|me|ko|change\s*karke|badal\s*kar|to|as|[:=])?\s*/iu', '', $rawSpeech);
+        $cleanVal = preg_replace('/\s*(?:likho|daalo|karo|bharo|kardo|kar\s*do|kar\s*de|kar\s*dijiye|kijiye|rakho|rakh\s*do|set\s*karo|set\s*kardo|set\s*kar\s*do|hoga|hai)$/iu', '', $cleanVal);
         $cleanVal = trim($cleanVal);
         if (mb_strlen($cleanVal) >= 1) {
             $romanText = IraTextNormalizer::transliterate($cleanVal);
@@ -1406,7 +1590,7 @@ class IraFormUnderstandingService
         $warnings = $extractionResult['warnings'];
 
         // If deterministic extraction found no updates, try LLM fallback if configured
-        if (empty($updates) && empty($sensitiveSkipped) && empty($fileSkipped) && $this->gemini->isConfigured()) {
+        if (empty($updates) && empty($sensitiveSkipped) && empty($fileSkipped) && $this->formBridge->isConfigured()) {
             $llmResult = $this->extractWithGemini($clean, $schema, $currentFields);
             if (!empty($llmResult['updates'])) {
                 $updates = $llmResult['updates'];
@@ -1700,10 +1884,18 @@ class IraFormUnderstandingService
      */
     protected function extractNumericValue(string $rawSpeech, string $normSpeech, array $fieldDef): ?array
     {
+        // When multiple numbers and contrast keywords are present and Gemini is configured, delegate to Gemini
+        $hasContrast = preg_match('/\b(nahi|not|galat|badal|change|balki|नहीं|pehle|ab|ki\s*jagah|instead\s*of)\b/iu', $rawSpeech);
+        $normDigits = IraTextNormalizer::convertDevanagariDigits($rawSpeech);
+        preg_match_all('/(?:\$|rs|inr|₹)?\s*([\d,]+(?:\.\d+)?)/i', $normDigits, $mAll);
+        if ($hasContrast && !empty($mAll[1]) && count($mAll[1]) >= 2 && $this->formBridge->isConfigured()) {
+            return null;
+        }
+
         $isFieldNamed = $this->isFieldMentioned($normSpeech, $fieldDef);
 
-        // Pattern 1: Standalone or field-adjacent currency phrase e.g. "500 dollars", "$1000", "1500 rs", "100 rupaye", "५०० डॉलर"
-        if (preg_match('/(\$?\s*[\d,]+(?:\.\d+)?)\s*(?:dollars?|dollar|usd|\$|rupaye|rs|inr|डॉलर|रुपये|रुपया|रु)/iu', $normSpeech, $m)) {
+        // Pattern 1: Standalone or field-adjacent currency phrase e.g. "500 dollars", "$1000", "1500 rs", "100 rupaye", "५०० डॉलर", "500 transfer"
+        if (preg_match('/(\$?\s*[\d,]+(?:\.\d+)?)\s*(?:dollars?|dollar|usd|\$|rupaye|rs|inr|transfer|bhejna|bhejo|send|रुपये|रुपया|डॉलर|ट्रांसफर)\b/iu', $normSpeech, $m)) {
             $num = (float) str_replace(['$', ',', ' '], '', $m[1]);
             return ['value' => $num, 'display_value' => (string) $num];
         }
@@ -2109,7 +2301,7 @@ class IraFormUnderstandingService
      */
     protected function isResetFormCommand(string $normSpeech): bool
     {
-        return (bool) preg_match('/\b(form\s*clear\s*karo|reset\s*karo|sab\s*hata\s*do|clear\s*all|start\s*over)\b/iu', $normSpeech);
+        return (bool) preg_match('/\b(reset\s*form|clear\s*form|form\s*reset|form\s*clear|reset\s*karo|form\s*clear\s*karo|form\s*reset\s*karo|sab\s*hata\s*do|clear\s*all|start\s*over|sab\s*clear\s*karo)\b/iu', $normSpeech);
     }
 
     /**
@@ -2142,30 +2334,22 @@ class IraFormUnderstandingService
             'speech' => "Maine form ke sabhi fields clear kar diye hain. Aap dubara shuru kar sakte hain.",
             'form_key' => $schema['key'],
             'form_selector' => $schema['selector'],
-            'form_updates' => $updates,
+            'form_updates' => array_values($updates),
             'remaining_required' => $this->calculateRemainingRequired($schema, []),
         ];
     }
 
     /**
-     * LLM Fallback extraction via Gemini (gemini-3.1-flash-lite).
+     * LLM Fallback extraction via Gemini (gemini-3.5-flash-lite).
      */
     protected function extractWithGemini(string $speech, array $schema, array $currentFields): array
     {
         try {
-            $prompt = "You are a voice form-filling assistant. The user is on a form titled '{$schema['title']}'.\n";
-            $prompt .= "Registered fields: " . json_encode(array_keys($schema['fields'])) . "\n";
-            $prompt .= "User utterance: \"{$speech}\"\n\n";
-            $prompt .= "Extract any values user wants to fill. Return strictly valid JSON object with keys:\n";
-            $prompt .= "{\n  \"updates\": { \"field_key\": \"extracted_value\" },\n  \"sensitive_skipped\": [\"field_name\"]\n}\n";
-            $prompt .= "Do not invent fields. Never extract passwords or PINs.";
+            $aiResult = $this->formBridge->extractFieldValues($speech, $schema, $currentFields);
 
-            $response = $this->gemini->generateText($prompt);
-            $parsed = json_decode($response, true);
-
-            if (is_array($parsed) && !empty($parsed['updates'])) {
+            if ($aiResult['success'] && !empty($aiResult['updates'])) {
                 $validUpdates = [];
-                foreach ($parsed['updates'] as $fKey => $val) {
+                foreach ($aiResult['updates'] as $fKey => $val) {
                     if (isset($schema['fields'][$fKey])) {
                         $fDef = $schema['fields'][$fKey];
                         if (!($fDef['sensitive'] ?? false) && !($fDef['read_only'] ?? false)) {
@@ -2184,7 +2368,7 @@ class IraFormUnderstandingService
                 }
                 return [
                     'updates' => $validUpdates,
-                    'sensitive_skipped' => $parsed['sensitive_skipped'] ?? [],
+                    'sensitive_skipped' => [],
                 ];
             }
         } catch (\Throwable $e) {
@@ -2192,6 +2376,489 @@ class IraFormUnderstandingService
         }
 
         return ['updates' => [], 'sensitive_skipped' => []];
+    }
+
+    /**
+     * Resolve explicit direct field targeting, field modifications, and field switches.
+     */
+    public function resolveDirectFieldTargeting(
+        string $clean,
+        string $norm,
+        array $schema,
+        array $currentFields,
+        array $guideState,
+        string $language,
+        ?array $domEligibleKeys = null
+    ): ?array {
+        $fields = $schema['fields'] ?? [];
+        if (empty($fields)) {
+            return null;
+        }
+
+        // Active field payload for fallback / responses
+        $currentFieldKey = $guideState['current_field'] ?? ($guideState['field_sequence'][0] ?? null);
+        $activeFieldDef = $currentFieldKey ? ($fields[$currentFieldKey] ?? null) : null;
+        $activeFieldPayload = $activeFieldDef ? [
+            'key' => $currentFieldKey,
+            'name' => $activeFieldDef['name'],
+            'selector' => $activeFieldDef['selector'],
+            'label' => $activeFieldDef['label'],
+            'type' => $activeFieldDef['type'],
+        ] : null;
+
+        $eligibleLabels = [];
+        foreach ($fields as $fk => $fd) {
+            if (!$this->isSensitiveField($fd) && !$this->isReadOnlyOrHiddenField($fd) && !($fd['file_upload'] ?? false)) {
+                $eligibleLabels[] = $fd['label'];
+            }
+        }
+        $labelsSummary = $this->formatFieldLabelsList($eligibleLabels);
+
+        // 0. Check for Compound / Multi-field instruction (e.g. "Naam Ramesh Kumar aur country India kar do")
+        if (preg_match('/\b(aur|and|,)\b/iu', $clean)) {
+            $multiExtraction = $this->extractFieldsDeterministic($clean, $schema, $currentFields);
+            if (!empty($multiExtraction['updates']) && count($multiExtraction['updates']) > 1) {
+                $multiUpdates = $multiExtraction['updates'];
+                $updatedKeys = array_keys($multiUpdates);
+                foreach ($multiUpdates as $uk => $ud) {
+                    $currentFields[$uk] = $ud['value'];
+                }
+                $guideState['filled_fields'] = array_unique(array_merge($guideState['filled_fields'] ?? [], $updatedKeys));
+                $guideState['handled_fields'] = array_unique(array_merge($guideState['handled_fields'] ?? [], $updatedKeys));
+
+                $isEditForm = $guideState['is_edit_form'] ?? IraFormRegistry::isEditForm($schema);
+                $fieldSequence = $guideState['field_sequence'] ?? array_keys($schema['fields']);
+                $nextFieldKey = $this->findNextEligibleField(
+                    $schema,
+                    $fieldSequence,
+                    $currentFields,
+                    $updatedKeys,
+                    $domEligibleKeys,
+                    $isEditForm,
+                    $guideState['handled_fields']
+                );
+
+                if ($nextFieldKey !== null) {
+                    $nextFieldDef = $schema['fields'][$nextFieldKey];
+                    $nextQ = $this->getFieldPromptQuestion($nextFieldDef, $schema, $language);
+                    $labelsWithVals = array_map(fn($u) => "{$u['label']}: {$u['display_value']}", $multiUpdates);
+
+                    if ($language === 'en') {
+                        $speech = "Recorded " . implode(', ', $labelsWithVals) . ". Now please specify the {$nextQ}";
+                    } elseif ($language === 'hinglish') {
+                        $speech = "Maine " . implode(', ', $labelsWithVals) . " bhar diya hai. Ab {$nextQ}";
+                    } else {
+                        $speech = "मैंने " . implode(', ', $labelsWithVals) . " भर दिया है। अब {$nextQ}";
+                    }
+
+                    $guideState['current_field'] = $nextFieldKey;
+                    $guideState['step_index'] = array_search($nextFieldKey, $fieldSequence, true) ?: 0;
+                    $guideState['status'] = 'in_progress';
+
+                    return [
+                        'success' => true,
+                        'status' => 'field_updated',
+                        'action' => 'prompt',
+                        'speech' => $speech,
+                        'form_key' => $schema['key'],
+                        'form_title' => $schema['title'],
+                        'form_selector' => $schema['selector'],
+                        'guide_state' => $guideState,
+                        'active_field' => [
+                            'key' => $nextFieldKey,
+                            'name' => $nextFieldDef['name'],
+                            'selector' => $nextFieldDef['selector'],
+                            'label' => $nextFieldDef['label'],
+                            'type' => $nextFieldDef['type'],
+                        ],
+                        'form_updates' => array_values($multiUpdates),
+                    ];
+                }
+
+                return $this->buildCompletionPayload($schema, $currentFields, $guideState, $multiUpdates, []);
+            }
+        }
+
+        // 1. Check if user is referencing a field from another form / foreign field not in this schema
+        $foreignConcepts = [
+            'stak_package' => ['package', 'plan', 'staking package', 'पैकेज', 'प्लान'],
+            'transfer_amount' => ['transfer amount', 'dollars', 'rashi', 'राशि', 'अमाउंट'],
+            'p2p_receiver' => ['receiver', 'recipient', 'receiver id', 'kisko bhejna hai'],
+            'support_ticket' => ['ticket', 'complaint', 'शिकायत'],
+            'wallet_crypto' => ['crypto address', 'वॉलेट एड्रेस'],
+            'kyc_docs' => ['pan card', 'pan', 'aadhar', 'passport', 'पैन कार्ड'],
+            'bank_details' => ['bank name', 'account number', 'ifsc', 'branch', 'खाता संख्या', 'बैंक'],
+        ];
+
+        foreach ($foreignConcepts as $conceptKey => $conceptAliases) {
+            $schemaHasConcept = false;
+            foreach ($fields as $fk => $fd) {
+                $fName = strtolower($fd['name']);
+                $fLabel = strtolower($fd['label']);
+                foreach ($conceptAliases as $ca) {
+                    if (str_contains($fName, $ca) || str_contains($fLabel, $ca) || $fk === $ca) {
+                        $schemaHasConcept = true;
+                        break 2;
+                    }
+                }
+            }
+
+            if (!$schemaHasConcept) {
+                foreach ($conceptAliases as $ca) {
+                    $escapedCa = preg_quote($ca, '/');
+                    if (
+                        preg_match('/(?:^|\s)' . $escapedCa . '\s+(?:.+?)\s*(?:kar\s*do|kardo|likho|daalo|bharo|rakho|set\s*karo|kijiye|hoga)/iu', $clean) ||
+                        preg_match('/(?:^|\s)' . $escapedCa . '\s*(?:mein|me|ko|change\s*karke|badal\s*kar|to|as|select|chuno|kar\s*do|kardo|likho|daalo|bharo|[:=])\b/iu', $clean) ||
+                        preg_match('/(?:^|\s)' . $escapedCa . '\s*(?:change\s*karna\s*hai|badalna\s*hai|badlo|change\s*karo|dobara\s*badlo|par\s*jao|select\s*karo|chuno)\b/iu', $clean) ||
+                        preg_match('/(?:^|\s)(?:change|update|set|badlo)\s+' . $escapedCa . '\b/iu', $clean)
+                    ) {
+                        return [
+                            'success' => false,
+                            'status' => 'invalid_field',
+                            'action' => 'prompt',
+                            'speech' => $language === 'en'
+                                ? "This field is not available in the {$schema['title']} form. Please choose from available fields: {$labelsSummary}."
+                                : ($language === 'hinglish'
+                                    ? "Yeh field {$schema['title']} form mein uplabdh nahi hai. Kripya is form ke fields batayein: {$labelsSummary}."
+                                    : "यह field {$schema['title']} form में उपलब्ध नहीं है। कृपया इस form के fields (जैसे: {$labelsSummary}) बताएं।"),
+                            'form_key' => $schema['key'],
+                            'form_selector' => $schema['selector'],
+                            'guide_state' => $guideState,
+                            'active_field' => $activeFieldPayload,
+                            'form_updates' => [],
+                        ];
+                    }
+                }
+            }
+        }
+
+        // 2. Build alias map for fields in current schema and detect targeted field
+        $matchedTarget = null;
+        $matchedAlias = '';
+
+        foreach ($fields as $fieldKey => $fieldDef) {
+            $aliases = $this->collectFieldAliases($fieldKey, $fieldDef);
+            // Sort aliases longest first
+            usort($aliases, fn($a, $b) => mb_strlen($b) <=> mb_strlen($a));
+
+            foreach ($aliases as $alias) {
+                if (mb_strlen($alias) < 2) continue;
+                $esc = preg_quote($alias, '/');
+
+                $isTargeted = false;
+
+                // Pattern A: Starts with alias or with change/set + alias
+                if (preg_match('/^(?:kripya|please|change|update|set|badlo|dobara\s*badlo)?\s*' . $esc . '\b/iu', $clean)) {
+                    $isTargeted = true;
+                }
+                // Pattern B: Alias followed by connector particle or action tail
+                elseif (preg_match('/(?:^|\s)' . $esc . '\s*(?:mein|me|ko|change\s*karke|badal\s*kar|ko\s*badal\s*kar|set\s*karke|rakho|likho|daalo|bharo|ka|ki|ke|to|as|[:=])\b/iu', $clean)) {
+                    $isTargeted = true;
+                }
+                // Pattern C: Alias followed by change command
+                elseif (preg_match('/(?:^|\s)' . $esc . '\s*(?:change\s*karna\s*hai|badalna\s*hai|badlo|change\s*karo|dobara\s*badlo|par\s*jao|select\s*karo|chuno|दोबारा\s*बदलो|बदलो|बदल\s*दो|बदलना\s*है)\b/iu', $clean)) {
+                    $isTargeted = true;
+                }
+                // Pattern D: Contrastive "pehle ... tha ab ..."
+                elseif (preg_match('/(?:^|\s)' . $esc . '\s*pehle\s*.+?\s*tha\s*(?:ab|lekin|aur)\s*.+?/iu', $clean)) {
+                    $isTargeted = true;
+                }
+
+                if ($isTargeted) {
+                    if ($matchedTarget === null || mb_strlen($alias) > mb_strlen($matchedAlias)) {
+                        $matchedTarget = [
+                            'key' => $fieldKey,
+                            'def' => $fieldDef,
+                        ];
+                        $matchedAlias = $alias;
+                    }
+                }
+            }
+        }
+
+        if ($matchedTarget === null) {
+            return null; // Not a direct field targeting command
+        }
+
+        $targetKey = $matchedTarget['key'];
+        $targetDef = $matchedTarget['def'];
+
+        // 3. Sensitivity check
+        if ($this->isSensitiveField($targetDef)) {
+            return [
+                'success' => false,
+                'status' => 'sensitive_field_rejected',
+                'action' => 'prompt',
+                'speech' => $language === 'en'
+                    ? "For security, {$targetDef['label']} cannot be entered via voice. Please enter it manually on screen."
+                    : ($language === 'hinglish'
+                        ? "Suraksha ke liye, {$targetDef['label']} voice se enter nahi kiya ja sakta. Kripya screen par manually enter karein."
+                        : "सुरक्षा कारणों से, {$targetDef['label']} आवाज़ से नहीं भरा जा सकता। कृपया इसे स्क्रीन पर स्वयं भरें।"),
+                'form_key' => $schema['key'],
+                'form_selector' => $schema['selector'],
+                'guide_state' => $guideState,
+                'active_field' => $activeFieldPayload,
+                'form_updates' => [],
+            ];
+        }
+
+        // 4. Read-only check
+        if ($this->isReadOnlyOrHiddenField($targetDef)) {
+            return [
+                'success' => false,
+                'status' => 'readonly_field_rejected',
+                'action' => 'prompt',
+                'speech' => $language === 'en'
+                    ? "{$targetDef['label']} is a read-only field and cannot be changed."
+                    : ($language === 'hinglish'
+                        ? "{$targetDef['label']} read-only field hai aur isse badla nahi ja sakta."
+                        : "{$targetDef['label']} read-only field है और इसे बदला नहीं जा सकता।"),
+                'form_key' => $schema['key'],
+                'form_selector' => $schema['selector'],
+                'guide_state' => $guideState,
+                'active_field' => $activeFieldPayload,
+                'form_updates' => [],
+            ];
+        }
+
+        // 5. File upload check
+        if ($targetDef['file_upload'] ?? false) {
+            return [
+                'success' => false,
+                'status' => 'file_upload_rejected',
+                'action' => 'prompt',
+                'speech' => $language === 'en'
+                    ? "{$targetDef['label']} is a file upload field. Please choose the file on screen using the button."
+                    : ($language === 'hinglish'
+                        ? "{$targetDef['label']} file upload field hai. Kripya screen par Choose File button se file select karein."
+                        : "{$targetDef['label']} फ़ाइल अपलोड फ़ील्ड है। कृपया स्क्रीन पर Choose File बटन से फ़ाइल चुनें।"),
+                'form_key' => $schema['key'],
+                'form_selector' => $schema['selector'],
+                'guide_state' => $guideState,
+                'active_field' => $activeFieldPayload,
+                'form_updates' => [],
+            ];
+        }
+
+        // 6. Eligible field: Check if switch-only or value provided
+        $escMatched = preg_quote($matchedAlias, '/');
+        $rawRest = preg_replace('/^(?:change|update|set|badlo|kripya|please)?\s*' . $escMatched . '\s*(?:mein|me|ko|change\s*karke|badal\s*kar|ko\s*badal\s*kar|set\s*karke|to|as|hai|rakho|likho|daalo|bharo|[:=])?\s*/iu', '', $clean);
+        $rawRest = trim($rawRest);
+
+        $isSwitchOnly = ($rawRest === '') || preg_match('/^(?:change(?:\s*karna\s*hai|\s*karna|\s*karo)?|badalna(?:\s*hai)?|badlo|dobara\s*badlo|par\s*jao|select(?:\s*karo)?|chuno|दोबारा\s*बदलो|बदलो|बदल\s*दो|बदलना\s*है|change|dobara|karna\s*hai|karna)$/iu', $rawRest);
+
+        $rest = preg_replace('/\s*(?:likho|daalo|karo|bharo|kardo|kar\s*do|kar\s*de|kar\s*dijiye|kijiye|rakho|rakh\s*do|set\s*karo|set\s*kardo|set\s*kar\s*do|hoga|hai)$/iu', '', $rawRest);
+        $rest = trim($rest);
+
+        if ($isSwitchOnly) {
+            $guideState['current_field'] = $targetKey;
+            $guideState['step_index'] = array_search($targetKey, $guideState['field_sequence'] ?? []) ?: 0;
+            $q = $this->getFieldPromptQuestion($targetDef, $schema, $language);
+
+            $switchSpeech = $language === 'en'
+                ? "Sure, let's update {$targetDef['label']}. {$q}"
+                : ($language === 'hinglish'
+                    ? "Theek hai, {$targetDef['label']} ko dobara badalte hain. {$q}"
+                    : "ठीक है, {$targetDef['label']} को दोबारा बदलते हैं। {$q}");
+
+            return [
+                'success' => true,
+                'status' => 'switch_field',
+                'action' => 'prompt',
+                'speech' => $switchSpeech,
+                'form_key' => $schema['key'],
+                'form_selector' => $schema['selector'],
+                'guide_state' => $guideState,
+                'active_field' => [
+                    'key' => $targetKey,
+                    'name' => $targetDef['name'],
+                    'selector' => $targetDef['selector'],
+                    'label' => $targetDef['label'],
+                    'type' => $targetDef['type'],
+                ],
+                'form_updates' => [],
+            ];
+        }
+
+        // 7. Value is provided: Extract and apply update
+        $evalSpeech = $rest !== '' ? $rest : $clean;
+        $extracted = $this->extractTargetedFieldValue($evalSpeech, $this->normalizeUtterance($evalSpeech), $targetDef, $schema);
+
+        if ($extracted === null) {
+            $extracted = $this->extractTargetedFieldValue($clean, $norm, $targetDef, $schema);
+        }
+
+        if ($extracted === null && $this->formBridge->isConfigured()) {
+            $aiRes = $this->formBridge->extractFieldValues($clean, $schema, $currentFields, $targetKey);
+            if ($aiRes['success'] && !empty($aiRes['updates']) && isset($aiRes['updates'][$targetKey])) {
+                $extracted = [
+                    'value' => $aiRes['updates'][$targetKey],
+                    'display_value' => (string) $aiRes['updates'][$targetKey],
+                    'is_correction' => $aiRes['is_correction'] ?? true,
+                ];
+            }
+        }
+
+        if ($extracted === null) {
+            $guideState['current_field'] = $targetKey;
+            $guideState['step_index'] = array_search($targetKey, $guideState['field_sequence'] ?? []) ?: 0;
+            $clarifySpeech = $this->buildFieldClarificationSpeech($targetDef, $language);
+
+            return [
+                'success' => false,
+                'status' => 'clarify_field',
+                'action' => 'prompt',
+                'speech' => $clarifySpeech,
+                'form_key' => $schema['key'],
+                'form_selector' => $schema['selector'],
+                'guide_state' => $guideState,
+                'active_field' => [
+                    'key' => $targetKey,
+                    'name' => $targetDef['name'],
+                    'selector' => $targetDef['selector'],
+                    'label' => $targetDef['label'],
+                    'type' => $targetDef['type'],
+                ],
+                'form_updates' => [],
+            ];
+        }
+
+        $val = $extracted['value'];
+        $valDisp = $extracted['display_value'] ?? (string) $val;
+        $spokenVal = $this->formatSpokenValue($valDisp, $targetDef, $language);
+
+        $currentFields[$targetKey] = $val;
+        $guideState['filled_fields'] = array_unique(array_merge($guideState['filled_fields'] ?? [], [$targetKey]));
+        $guideState['handled_fields'] = array_unique(array_merge($guideState['handled_fields'] ?? [], [$targetKey]));
+
+        $updates = [
+            $targetKey => [
+                'field' => $targetKey,
+                'name' => $targetDef['name'],
+                'selector' => $targetDef['selector'],
+                'value' => $val,
+                'display_value' => $valDisp,
+                'spoken_value' => $spokenVal,
+                'label' => $targetDef['label'],
+                'type' => $targetDef['type'],
+                'events' => $targetDef['dynamic_events'] ?? ['input', 'change'],
+            ]
+        ];
+
+        $isEditForm = $guideState['is_edit_form'] ?? IraFormRegistry::isEditForm($schema);
+        $fieldSequence = $guideState['field_sequence'] ?? array_keys($schema['fields']);
+        $nextFieldKey = $this->findNextEligibleField(
+            $schema,
+            $fieldSequence,
+            $currentFields,
+            [$targetKey],
+            $domEligibleKeys,
+            $isEditForm,
+            $guideState['handled_fields']
+        );
+
+        if ($nextFieldKey !== null) {
+            $nextFieldDef = $schema['fields'][$nextFieldKey];
+            $nextQ = $this->getFieldPromptQuestion($nextFieldDef, $schema, $language);
+
+            $speech = $language === 'en'
+                ? "{$targetDef['label']} has been changed to {$spokenVal}. Now please specify the {$nextQ}"
+                : ($language === 'hinglish'
+                    ? "Theek hai, {$targetDef['label']} ko badal kar {$spokenVal} kar diya hai. Ab {$nextQ}"
+                    : "ठीक है, {$targetDef['label']} को बदल कर {$spokenVal} कर दिया है। अब {$nextQ}");
+
+            $guideState['current_field'] = $nextFieldKey;
+            $guideState['step_index'] = array_search($nextFieldKey, $fieldSequence, true) ?: 0;
+            $guideState['status'] = 'in_progress';
+
+            return [
+                'success' => true,
+                'status' => 'field_updated',
+                'action' => 'prompt',
+                'speech' => $speech,
+                'form_key' => $schema['key'],
+                'form_title' => $schema['title'],
+                'form_selector' => $schema['selector'],
+                'guide_state' => $guideState,
+                'active_field' => [
+                    'key' => $nextFieldKey,
+                    'name' => $nextFieldDef['name'],
+                    'selector' => $nextFieldDef['selector'],
+                    'label' => $nextFieldDef['label'],
+                    'type' => $nextFieldDef['type'],
+                ],
+                'form_updates' => array_values($updates),
+            ];
+        }
+
+        return $this->buildCompletionPayload($schema, $currentFields, $guideState, $updates, [], $targetDef, $valDisp, true);
+    }
+
+    /**
+     * Collect comprehensive aliases for a field across English, Hinglish, and Devanagari.
+     */
+    protected function collectFieldAliases(string $fieldKey, array $fieldDef): array
+    {
+        $aliases = $fieldDef['aliases'] ?? [];
+        $aliases[] = $fieldKey;
+        $aliases[] = $fieldDef['name'] ?? '';
+
+        $label = $fieldDef['label'] ?? '';
+        $aliases[] = $label;
+        $cleanLabel = trim(preg_replace('/\s*\(.*?\)/', '', $label));
+        if ($cleanLabel !== '' && $cleanLabel !== $label) {
+            $aliases[] = $cleanLabel;
+        }
+
+        $lowerKey = strtolower($fieldKey);
+        $lowerName = strtolower($fieldDef['name'] ?? '');
+        $lowerLabel = strtolower($label);
+
+        if (str_contains($lowerKey, 'name') || str_contains($lowerName, 'name') || str_contains($lowerLabel, 'name')) {
+            $aliases = array_merge($aliases, ['name', 'naam', 'nam', 'full name', 'poora naam', 'पूरा नाम', 'नाम', 'मेरा नाम']);
+        }
+        if (str_contains($lowerKey, 'mobile') || str_contains($lowerName, 'mobile') || str_contains($lowerLabel, 'mobile') || str_contains($lowerLabel, 'phone')) {
+            $aliases = array_merge($aliases, ['mobile', 'phone', 'contact', 'mobile number', 'phone number', 'फ़ोन', 'मोबाइल', 'मोबाइल नंबर', 'संपर्क']);
+        }
+        if (str_contains($lowerKey, 'country') || str_contains($lowerName, 'country') || str_contains($lowerLabel, 'country')) {
+            $aliases = array_merge($aliases, ['country', 'desh', 'nation', 'videsh', 'कंट्री', 'देश', 'राष्ट्र']);
+        }
+        if (str_contains($lowerKey, 'email') || str_contains($lowerName, 'email') || str_contains($lowerLabel, 'email')) {
+            $aliases = array_merge($aliases, ['email', 'e-mail', 'mail', 'ईमेल', 'मेल']);
+        }
+        if (str_contains($lowerKey, 'amount') || str_contains($lowerName, 'amount') || str_contains($lowerLabel, 'amount')) {
+            $aliases = array_merge($aliases, ['amount', 'rashi', 'paise', 'dollars', 'rakam', 'रकम', 'राशि', 'अमाउंट', 'पैसे', 'डॉलर']);
+        }
+        if (str_contains($lowerKey, 'package') || str_contains($lowerName, 'package') || str_contains($lowerLabel, 'package')) {
+            $aliases = array_merge($aliases, ['package', 'plan', 'staking package', 'पैकेज', 'प्लान']);
+        }
+        if (str_contains($lowerKey, 'memberid') || str_contains($lowerName, 'memberid') || str_contains($lowerLabel, 'member id') || str_contains($lowerLabel, 'receiver')) {
+            $aliases = array_merge($aliases, ['member id', 'memberid', 'receiver id', 'receiver member id', 'recipient', 'user id', 'मेंबर आईडी', 'सदस्य आईडी']);
+        }
+        if (str_contains($lowerKey, 'subject') || str_contains($lowerName, 'subject') || str_contains($lowerLabel, 'subject')) {
+            $aliases = array_merge($aliases, ['subject', 'topic', 'mudda', 'vishay', 'विषय', 'सब्जेक्ट']);
+        }
+        if (str_contains($lowerKey, 'issue') || str_contains($lowerName, 'issue') || str_contains($lowerLabel, 'issue') || str_contains($lowerLabel, 'message') || str_contains($lowerLabel, 'reply')) {
+            $aliases = array_merge($aliases, ['issue', 'message', 'reply', 'sandesh', 'विवरण', 'मैसेज', 'संदेश']);
+        }
+        if (str_contains($lowerKey, 'pass') || str_contains($lowerName, 'pass') || str_contains($lowerLabel, 'password') || str_contains($lowerLabel, 'pin')) {
+            $aliases = array_merge($aliases, ['password', 'txn password', 'pin', 'tpin', 'security pin', 'पासवर्ड', 'पिन']);
+        }
+        if (str_contains($lowerKey, 'wallet') || str_contains($lowerName, 'wallet') || str_contains($lowerLabel, 'wallet')) {
+            $aliases = array_merge($aliases, ['wallet address', 'address', 'crypto address', 'वॉलेट एड्रेस', 'पता']);
+        }
+        if (str_contains($lowerKey, 'image') || str_contains($lowerName, 'image') || str_contains($lowerLabel, 'image') || str_contains($lowerLabel, 'photo')) {
+            $aliases = array_merge($aliases, ['profile image', 'photo', 'picture', 'image', 'फोटो', 'तस्वीर']);
+        }
+
+        $cleaned = [];
+        foreach ($aliases as $a) {
+            $t = trim((string) $a);
+            if ($t !== '' && !in_array($t, $cleaned, true)) {
+                $cleaned[] = $t;
+            }
+        }
+        return $cleaned;
     }
 
     /**

@@ -103,6 +103,9 @@ function Income3xachieved($memberid)
     $var =  MemberDetail::where([['memberid', $memberid], ['status', '!=', 'Temp']])->first();
     if ($var) {
         $date = $var['activated_at'];
+        if (empty($date)) {
+            return 0;
+        }
         $direct = DirectIncome::where([['status', 'Paid'], ['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');
         $staking = StakingIncome::where([['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');
         $level = LevelIncome::where([['status', 'Paid'], ['memberid', $memberid], ['created_at', '>=', $date]])->sum('amount');

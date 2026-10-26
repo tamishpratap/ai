@@ -113,6 +113,7 @@ class AppNavigationOntology
             'roles' => ['member'],
             'aliases' => [
                 'dashboard', 'main dashboard', 'member dashboard', 'home dashboard',
+                'dashbord', 'member dashbord', 'main dashbord', 'home dashbord',
                 'डैशबोर्ड', 'डैश बोर्ड', 'मेन डैशबोर्ड', 'मेंबर डैशबोर्ड'
             ],
         ],
@@ -126,6 +127,7 @@ class AppNavigationOntology
             'roles' => ['member'],
             'aliases' => [
                 'edit profile', 'user summary', 'my profile', 'meri profile', 'profile details', 'profile',
+                'profiel', 'my profiel', 'meri profiel', 'edit profiel',
                 'एडिट प्रोफाइल', 'यूजर समरी', 'मेरी प्रोफाइल', 'प्रोफाइल डिटेल्स', 'प्रोफाइल'
             ],
         ],
@@ -321,7 +323,8 @@ class AppNavigationOntology
             'roles' => ['member'],
             'aliases' => [
                 'withdrawal fund', 'withdraw fund', 'main wallet', 'nikasi fund', 'paisa nikalo', 'withdraw money',
-                'विड्रॉल फंड', 'विथड्रॉल फंड', 'पैसे निकालो', 'मेन वॉलेट', 'निकासी फंड'
+                'withdrawal page', 'withdraw page', 'withdrawal', 'withdraw', 'withdrawl', 'withdrawl page', 'withdrawl fund',
+                'विड्रॉल फंड', 'विथड्रॉल फंड', 'पैसे निकालो', 'मेन वॉलेट', 'निकासी फंड', 'विथड्रॉल पेज', 'विड्रॉल पेज', 'विथड्रॉल', 'विड्रॉल'
             ],
         ],
         'member_wallet_history' => [
@@ -373,6 +376,7 @@ class AppNavigationOntology
             'roles' => ['member'],
             'aliases' => [
                 'p2p wallet', 'p to p wallet', 'peer to peer wallet', 'petrol wallet',
+                'p2p open', 'open p2p', 'p2p kholo',
                 'पी2पी वॉलेट', 'पी टू पी वॉलेट', 'पीयर टू पीयर वॉलेट'
             ],
         ],
@@ -839,6 +843,7 @@ class AppNavigationOntology
                 'panel' => 'member',
                 'aliases' => [
                     'withdrawal', 'withdrawals', 'wallet', 'wallets', 'nikasi', 'withdraw', 'withdrawal section', 'wallet section',
+                    'withdrawl', 'withdrawl section',
                     'विड्रॉल', 'विथड्रॉल', 'विड्रोल', 'निकासी', 'वॉलेट', 'विड्रॉल सेक्शन', 'वॉलेट सेक्शन'
                 ],
                 'pages' => [
@@ -882,8 +887,8 @@ class AppNavigationOntology
                 'name' => 'Member Management',
                 'panel' => 'admin',
                 'aliases' => [
-                    'member management', 'members', 'member', 'users', 'user management', 'users list', 'member section',
-                    'मेंबर मैनेजमेंट', 'मेंबर्स', 'मेंबर', 'यूजर्स', 'यूजर मैनेजमेंट', 'मेंबर सेक्शन'
+                    'member management', 'members management', 'users', 'user management', 'users list', 'member section', 'all members', 'admin members',
+                    'मेंबर मैनेजमेंट', 'मेंबर्स मैनेजमेंट', 'यूजर्स', 'यूजर मैनेजमेंट', 'मेंबर सेक्शन'
                 ],
                 'pages' => [
                     'Members Details' => 'admin_member_details',
