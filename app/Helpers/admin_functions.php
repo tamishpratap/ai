@@ -62,14 +62,17 @@ function totalPackages()
 
 function todaysWithdrawal()
 {
-    $sum = WithdrawalRequest::where([['status', 'Approved'], ['payment_date', date('Y-m-d')]])->sum('gross_amount');
-    return $sum;
+    $amountCol = \Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'gross_amount') ? 'gross_amount' : 'amount';
+    $dateCol = \Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'payment_date') ? 'payment_date' : 'created_at';
+    $sum = WithdrawalRequest::where('status', 'Approved')->whereDate($dateCol, date('Y-m-d'))->sum($amountCol);
+    return $sum ?? 0;
 }
 
 function totalWithdrawal()
 {
-    $sum = WithdrawalRequest::where('status', 'Approved')->sum('gross_amount');
-    return $sum;
+    $amountCol = \Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'gross_amount') ? 'gross_amount' : 'amount';
+    $sum = WithdrawalRequest::where('status', 'Approved')->sum($amountCol);
+    return $sum ?? 0;
 }
 
 function TodayinWallet()
@@ -136,20 +139,26 @@ function totalDirectInc()
 
 function totalgrossAmount()
 {
-    $count = WithdrawalRequest::where('status', 'Approved')->sum('gross_amount');
-    return $count;
+    $amountCol = \Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'gross_amount') ? 'gross_amount' : 'amount';
+    $count = WithdrawalRequest::where('status', 'Approved')->sum($amountCol);
+    return $count ?? 0;
 }
 
 function totalnetAmount()
 {
-    $count = WithdrawalRequest::where('status', 'Approved')->sum('net_amount');
-    return $count;
+    if (\Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'net_amount')) {
+        return WithdrawalRequest::where('status', 'Approved')->sum('net_amount') ?? 0;
+    }
+    $amountCol = \Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'gross_amount') ? 'gross_amount' : 'amount';
+    return WithdrawalRequest::where('status', 'Approved')->sum($amountCol) ?? 0;
 }
 
 function totaldeductions()
 {
-    $count = WithdrawalRequest::where('status', 'Approved')->sum('service_charge');
-    return $count;
+    if (\Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'service_charge')) {
+        return WithdrawalRequest::where('status', 'Approved')->sum('service_charge') ?? 0;
+    }
+    return 0;
 }
 
 function totalFundImported()

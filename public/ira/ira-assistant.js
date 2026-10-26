@@ -104,6 +104,23 @@
 
             this.initialized = true;
             console.log('[IRA] Voice Navigation Assistant initialized. Role: ' + this.config.role + ', Locale: ' + this.selectedLocale);
+
+            // Phase 2: Resume continuous voice conversation across page transitions if flagged
+            try {
+                if (sessionStorage.getItem('ira_continuous_nav') === '1') {
+                    sessionStorage.removeItem('ira_continuous_nav');
+                    this.isContinuousSession = true;
+                    setTimeout(() => {
+                        this.openModal();
+                        this.setVoiceState('READY', 'Ready for next command...');
+                        try {
+                            this.startListening();
+                        } catch (err) {
+                            console.log('[IRA] Auto-resume awaiting user gesture:', err);
+                        }
+                    }, 400);
+                }
+            } catch (e) {}
         },
 
         /**
@@ -168,6 +185,8 @@
          * Close Assistant Modal (Adaptive Bridge for Bootstrap 5 and Bootstrap 4)
          */
         closeModal: function () {
+            this.isContinuousSession = false;
+            try { sessionStorage.removeItem('ira_continuous_nav'); } catch (e) {}
             if (!this.elements.modal) return;
 
             if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
@@ -834,6 +853,7 @@
             this.clearMaxListeningTimer();
             this.clearStartingTimer();
             this.isAbortedByUser = false;
+            this.isContinuousSession = true;
             this.hasDispatchedTurn = false;
             this.emptyRestartCount = 0;
             this.sessionStartTime = Date.now();
@@ -909,6 +929,8 @@
          * Stop All Voice Activity
          */
         stopAll: function () {
+            this.isContinuousSession = false;
+            try { sessionStorage.removeItem('ira_continuous_nav'); } catch (e) {}
             this.clearStartingTimer();
             this.clearSilenceTimer();
             this.clearMaxListeningTimer();
@@ -916,6 +938,10 @@
             this.stopListening();
             this.stopSpeaking();
             this.setVoiceState('READY');
+        },
+
+        isContinuousActive: function () {
+            return !!this.isContinuousSession && !this.isAbortedByUser && this.currentState !== 'ERROR';
         },
 
         clearStartingTimer: function () {
@@ -1018,6 +1044,8 @@
                 // Handle Close Assistant Intent
                 if (result.intent === 'close_assistant') {
                     this.recentContext = {};
+                    this.isContinuousSession = false;
+                    try { sessionStorage.removeItem('ira_continuous_nav'); } catch (e) {}
                     this.speak(speechToSay, () => {
                         this.stopAll();
                         this.closeModal();
@@ -1080,6 +1108,8 @@
                 // Handle Cancel Intent
                 if (result.intent === 'cancel') {
                     this.recentContext = {};
+                    this.isContinuousSession = false;
+                    try { sessionStorage.removeItem('ira_continuous_nav'); } catch (e) {}
                     this.speak(speechToSay);
                     return true;
                 }
@@ -1136,10 +1166,24 @@
                     }
 
                     if (isSamePage) {
-                        // Already on this page; speak response naturally without unloading
-                        this.speak(speechToSay);
+                        // Already on this page; speak response naturally and resume listening if in continuous session
+                        this.speak(speechToSay, () => {
+                            if (this.isContinuousActive()) {
+                                this.clearAutoListenTimeout();
+                                this.autoListenTimeout = setTimeout(() => {
+                                    if (this.isContinuousActive() && !this.isRecognitionRunning && !this.isRecognitionStarting) {
+                                        this.startListening();
+                                    }
+                                }, 450);
+                            }
+                        });
                     } else {
-                        // Cross-page navigation: play synchronized chime and transition
+                        // Cross-page navigation: flag continuous session across page reload
+                        if (this.isContinuousActive()) {
+                            try {
+                                sessionStorage.setItem('ira_continuous_nav', '1');
+                            } catch (e) {}
+                        }
                         this.playNavigationCue(() => {
                             window.location.href = result.target_url;
                         });
@@ -1160,7 +1204,16 @@
                 }
 
                 // General conversational question or fallback
-                this.speak(speechToSay);
+                this.speak(speechToSay, () => {
+                    if (this.isContinuousActive()) {
+                        this.clearAutoListenTimeout();
+                        this.autoListenTimeout = setTimeout(() => {
+                            if (this.isContinuousActive() && !this.isRecognitionRunning && !this.isRecognitionStarting) {
+                                this.startListening();
+                            }
+                        }, 450);
+                    }
+                });
                 return true;
 
             } catch (err) {

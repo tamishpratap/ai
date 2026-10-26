@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Services\AI\IraFormRegistry;
 use App\Services\AI\IraFormUnderstandingService;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class IraGuidedVoiceFormFillingTest extends TestCase
@@ -775,5 +777,486 @@ class IraGuidedVoiceFormFillingTest extends TestCase
         $this->assertNull($init['active_field']);
         $this->assertStringContainsString('password', $init['speech']);
         $this->assertStringContainsString('manually', $init['speech']);
+    }
+
+    /**
+     * Test 32: Tier 1 - Fast Deterministic Path completely bypasses Gemini API calls.
+     */
+    public function test_deterministic_path_bypasses_gemini_completely(): void
+    {
+        Config::set('form_ai.api_key', 'test-api-key-active');
+        Http::fake();
+
+        $init = $this->formAi->initGuidedSession('member_staking', 'member');
+        $guideState = $init['guide_state'];
+
+        // Simple direct option "Gold"
+        $turn = $this->formAi->processGuidedTurn('Gold', 'member_staking', 'member', [], $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertEquals('Gold', $turn['form_updates'][0]['value']);
+        // Verify Gemini HTTP client was NEVER called!
+        Http::assertNothingSent();
+    }
+
+    /**
+     * Test 33: Tier 2 - Natural Roman Hinglish statement extracted via Gemini fallback.
+     */
+    public function test_natural_hinglish_amount_extraction_via_gemini_fallback(): void
+    {
+        Config::set('form_ai.api_key', 'test-api-key-active');
+
+        Http::fake([
+            '*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                [
+                                    'text' => json_encode([
+                                        'updates' => ['amount' => 500],
+                                        'is_correction' => false,
+                                        'is_ambiguous' => false,
+                                    ]),
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $init = $this->formAi->initGuidedSession('member_staking', 'member');
+        $guideState = $init['guide_state'];
+        $guideState['current_field'] = 'amount';
+        $currentFields = ['stak_package' => 'Gold'];
+
+        // Natural conversational Hinglish with complex fillers
+        $turn = $this->formAi->processGuidedTurn('is form me mujhe paanch sau dollar daalna hai', 'member_staking', 'member', $currentFields, $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertCount(1, $turn['form_updates']);
+        $this->assertEquals('amount', $turn['form_updates'][0]['field']);
+        $this->assertEquals(500, $turn['form_updates'][0]['value']);
+    }
+
+    /**
+     * Test 34: Multi-Field Single Utterance populates multiple fields in a single guided turn.
+     */
+    public function test_multi_field_instruction_in_single_guided_turn(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_p2p_transfer', 'member');
+        $guideState = $init['guide_state'];
+
+        // Compound instruction providing both recipient ID and transfer amount
+        $turn = $this->formAi->processGuidedTurn('GAB10045 ko 500 transfer kar do', 'member_p2p_transfer', 'member', [], $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertCount(2, $turn['form_updates']);
+
+        $updatesByField = [];
+        foreach ($turn['form_updates'] as $up) {
+            $updatesByField[$up['field']] = $up['value'];
+        }
+
+        $this->assertEquals('GAB10045', $updatesByField['memberid']);
+        $this->assertEquals(500, $updatesByField['amount']);
+
+        // Both fields must be in filled_fields
+        $this->assertContains('memberid', $turn['guide_state']['filled_fields']);
+        $this->assertContains('amount', $turn['guide_state']['filled_fields']);
+
+        // Since member_p2p_transfer has memberid and amount (and sensitive txn_password), flow completes!
+        $this->assertEquals('completed', $turn['status']);
+        $this->assertEquals('complete', $turn['action']);
+    }
+
+    /**
+     * Test 35: Spoken Value Correction via Gemini Fallback.
+     */
+    public function test_natural_spoken_correction_via_gemini_fallback(): void
+    {
+        Config::set('form_ai.api_key', 'test-api-key-active');
+
+        Http::fake([
+            '*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                [
+                                    'text' => json_encode([
+                                        'updates' => ['amount' => 2000],
+                                        'is_correction' => true,
+                                        'corrected_field' => 'amount',
+                                        'is_ambiguous' => false,
+                                    ]),
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $init = $this->formAi->initGuidedSession('member_staking', 'member');
+        $guideState = $init['guide_state'];
+        $guideState['current_field'] = 'amount';
+        $currentFields = ['stak_package' => 'Gold', 'amount' => 1000];
+
+        // Natural correction sentence
+        $turn = $this->formAi->processGuidedTurn('amount pehle 1000 tha ab 2000 kar do', 'member_staking', 'member', $currentFields, $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertEquals(2000, $turn['form_updates'][0]['value']);
+        $this->assertStringContainsString('बदल कर 2000', $turn['speech']);
+    }
+
+    /**
+     * Test 36: Reset Form Response JSON shape is a sequential array (fixing the object mismatch).
+     */
+    public function test_reset_form_response_shape_is_sequential_array(): void
+    {
+        $res = $this->formAi->processFormTurn('reset form', 'member_staking', 'member');
+
+        $this->assertTrue($res['success']);
+        $this->assertEquals('form_reset', $res['status']);
+        $this->assertTrue(is_array($res['form_updates']));
+        $this->assertTrue(array_is_list($res['form_updates']), 'form_updates must be a sequential list for JSON Array compatibility');
+    }
+
+    /**
+     * Test 37: Hallucinated / Unknown Fields from LLM are strictly rejected by Registry Validator.
+     */
+    public function test_hallucinated_fields_rejected_by_registry_validator(): void
+    {
+        Config::set('form_ai.api_key', 'test-api-key-active');
+
+        Http::fake([
+            '*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                [
+                                    'text' => json_encode([
+                                        'updates' => [
+                                            'amount' => 500,
+                                            'hallucinated_admin_field' => 'injected_val', // Must be rejected
+                                        ],
+                                        'is_correction' => false,
+                                    ]),
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $init = $this->formAi->initGuidedSession('member_staking', 'member');
+        $guideState = $init['guide_state'];
+        $guideState['current_field'] = 'amount';
+        $currentFields = ['stak_package' => 'Gold'];
+
+        $turn = $this->formAi->processGuidedTurn('paanch sau dollar', 'member_staking', 'member', $currentFields, $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertEquals(500, $turn['form_updates'][0]['value']);
+
+        $updatedFieldNames = array_column($turn['form_updates'], 'field');
+        $this->assertNotContains('hallucinated_admin_field', $updatedFieldNames);
+    }
+
+    /**
+     * Test 38: Edit form with prefilled fields offers first eligible field (Full Name) and does not skip it
+     */
+    public function test_edit_form_offers_prefilled_full_name_for_editing(): void
+    {
+        $currentFields = [
+            'name' => 'Life Leads',
+            'email' => 'user@example.com',
+            'mobile' => '9876543210',
+            'country' => 'India',
+        ];
+
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member', $currentFields);
+
+        $this->assertTrue($init['success']);
+        $this->assertEquals('asking_field', $init['status']);
+        $this->assertEquals('prompt', $init['action']);
+        $this->assertEquals('name', $init['guide_state']['current_field']);
+        $this->assertEquals('name', $init['active_field']['key']);
+        $this->assertTrue($init['guide_state']['is_edit_form']);
+        $this->assertEmpty($init['guide_state']['handled_fields']);
+        $this->assertStringContainsString('Full Name', $init['speech']);
+    }
+
+    /**
+     * Test 39: Prefilled Mobile and Country remain eligible while read-only Email is excluded
+     */
+    public function test_prefilled_mobile_and_country_remain_eligible_while_email_excluded(): void
+    {
+        $currentFields = [
+            'name' => 'Life Leads',
+            'email' => 'user@example.com',
+            'mobile' => '9876543210',
+            'country' => 'India',
+        ];
+
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member', $currentFields);
+
+        $fieldSequence = $init['guide_state']['field_sequence'];
+        $this->assertContains('name', $fieldSequence);
+        $this->assertContains('mobile', $fieldSequence);
+        $this->assertContains('country', $fieldSequence);
+        $this->assertNotContains('email', $fieldSequence, 'Read-only email must never be in editable sequence');
+    }
+
+    /**
+     * Test 40: Existing values are replaced correctly when user provides new values
+     */
+    public function test_existing_values_replaced_correctly_in_edit_form(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member', [
+            'name' => 'Life Leads',
+            'mobile' => '9876543210',
+            'country' => 'India',
+        ]);
+        $guideState = $init['guide_state'];
+        $currentFields = ['name' => 'Life Leads', 'mobile' => '9876543210', 'country' => 'India'];
+
+        // User edits Name to "Ramesh Kumar"
+        $turn = $this->formAi->processGuidedTurn('Ramesh Kumar', 'member_profile_user_summary', 'member', $currentFields, $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertEquals('field_updated', $turn['status']);
+        $this->assertEquals('Ramesh Kumar', $turn['form_updates'][0]['value']);
+        $this->assertEquals('name', $turn['form_updates'][0]['field']);
+        // Advances to mobile
+        $this->assertEquals('mobile', $turn['guide_state']['current_field']);
+        $this->assertContains('name', $turn['guide_state']['handled_fields']);
+    }
+
+    /**
+     * Test 41: Skipping a prefilled field preserves original value and advances to next field
+     */
+    public function test_skipping_prefilled_field_preserves_original_value(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member', [
+            'name' => 'Life Leads',
+            'mobile' => '9876543210',
+            'country' => 'India',
+        ]);
+        $guideState = $init['guide_state'];
+        $currentFields = ['name' => 'Life Leads', 'mobile' => '9876543210', 'country' => 'India'];
+
+        // User skips Name: "same rehne do"
+        $turn = $this->formAi->processGuidedTurn('same rehne do', 'member_profile_user_summary', 'member', $currentFields, $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertEquals('field_skipped', $turn['status']);
+        $this->assertEmpty($turn['form_updates']);
+        $this->assertEquals('mobile', $turn['guide_state']['current_field']);
+        $this->assertContains('name', $turn['guide_state']['handled_fields']);
+        $this->assertStringContainsString('Mobile Number', $turn['speech']);
+    }
+
+    /**
+     * Test 42: Prefilled field alone does not make guided edit session complete immediately
+     */
+    public function test_prefilled_fields_do_not_complete_session_immediately(): void
+    {
+        $currentFields = [
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'mobile' => '9876543210',
+            'country' => 'India',
+        ];
+
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member', $currentFields);
+
+        $this->assertNotEquals('completed', $init['status']);
+        $this->assertEquals('asking_field', $init['status']);
+        $this->assertNotNull($init['guide_state']['current_field']);
+    }
+
+    /**
+     * Test 43: Direct targeting — "Country ko Belgium kar do" directly targets Country
+     */
+    public function test_direct_targeting_country_ko_belgium_kar_do(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member', [
+            'name' => 'Life Leads',
+            'mobile' => '9876543210',
+            'country' => 'India',
+        ]);
+        $guideState = $init['guide_state'];
+        $currentFields = ['name' => 'Life Leads', 'mobile' => '9876543210', 'country' => 'India'];
+
+        // User speaks while active field is name: "Country ko Belgium kar do"
+        $turn = $this->formAi->processGuidedTurn('Country ko Belgium kar do', 'member_profile_user_summary', 'member', $currentFields, $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertEquals('field_updated', $turn['status']);
+        $this->assertCount(1, $turn['form_updates']);
+        $this->assertEquals('country', $turn['form_updates'][0]['field']);
+        $this->assertEquals('Belgium', $turn['form_updates'][0]['value']);
+        $this->assertStringContainsString('Country', $turn['speech']);
+        $this->assertStringContainsString('Belgium', $turn['speech']);
+    }
+
+    /**
+     * Test 44: Direct targeting does not change Name, Email, or Mobile
+     */
+    public function test_direct_targeting_does_not_modify_unrelated_fields(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member', [
+            'name' => 'Life Leads',
+            'email' => 'user@example.com',
+            'mobile' => '9876543210',
+            'country' => 'India',
+        ]);
+        $guideState = $init['guide_state'];
+        $currentFields = [
+            'name' => 'Life Leads',
+            'email' => 'user@example.com',
+            'mobile' => '9876543210',
+            'country' => 'India',
+        ];
+
+        $turn = $this->formAi->processGuidedTurn('Country mein Belgium kar do', 'member_profile_user_summary', 'member', $currentFields, $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertCount(1, $turn['form_updates']);
+        $this->assertEquals('country', $turn['form_updates'][0]['field']);
+        $updatedKeys = array_column($turn['form_updates'], 'field');
+        $this->assertNotContains('name', $updatedKeys);
+        $this->assertNotContains('mobile', $updatedKeys);
+        $this->assertNotContains('email', $updatedKeys);
+    }
+
+    /**
+     * Test 45: "Country change karna hai" asks for new Country value rather than restarting form
+     */
+    public function test_direct_targeting_switch_only_asks_for_field_value_without_restarting(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member', [
+            'name' => 'Life Leads',
+            'mobile' => '9876543210',
+            'country' => 'India',
+        ]);
+        $guideState = $init['guide_state'];
+        $currentFields = ['name' => 'Life Leads', 'mobile' => '9876543210', 'country' => 'India'];
+
+        // User says: "Country change karna hai"
+        $turn = $this->formAi->processGuidedTurn('Country change karna hai', 'member_profile_user_summary', 'member', $currentFields, $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertEquals('switch_field', $turn['status']);
+        $this->assertEquals('prompt', $turn['action']);
+        $this->assertEquals('country', $turn['guide_state']['current_field']);
+        $this->assertEquals('country', $turn['active_field']['key']);
+        $this->assertEmpty($turn['form_updates']);
+        $this->assertStringContainsString('Country', $turn['speech']);
+
+        // Now user answers on turn 2 with "Germany"
+        $turn2 = $this->formAi->processGuidedTurn('Germany', 'member_profile_user_summary', 'member', $currentFields, $turn['guide_state']);
+        $this->assertTrue($turn2['success']);
+        $this->assertEquals('country', $turn2['form_updates'][0]['field']);
+        $this->assertEquals('Germany', $turn2['form_updates'][0]['value']);
+    }
+
+    /**
+     * Test 46: Read-only field cannot be targeted for modification
+     */
+    public function test_read_only_field_direct_targeting_rejected(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member');
+        $guideState = $init['guide_state'];
+
+        $turn = $this->formAi->processGuidedTurn('Email test@example.com kar do', 'member_profile_user_summary', 'member', [], $guideState);
+
+        $this->assertFalse($turn['success']);
+        $this->assertEquals('readonly_field_rejected', $turn['status']);
+        $this->assertEmpty($turn['form_updates']);
+        $this->assertStringContainsString('read-only', $turn['speech']);
+        $this->assertEquals('name', $turn['active_field']['key']);
+    }
+
+    /**
+     * Test 47: Sensitive field cannot be targeted for voice filling
+     */
+    public function test_sensitive_field_direct_targeting_rejected(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_p2p_transfer', 'member');
+        $guideState = $init['guide_state'];
+
+        $turn = $this->formAi->processGuidedTurn('Password 123456 kar do', 'member_p2p_transfer', 'member', [], $guideState);
+
+        $this->assertFalse($turn['success']);
+        $this->assertEquals('sensitive_field_rejected', $turn['status']);
+        $this->assertEmpty($turn['form_updates']);
+        $this->assertStringContainsString('सुरक्षा', $turn['speech']);
+    }
+
+    /**
+     * Test 48: Foreign field targeting from another registered form is rejected
+     */
+    public function test_foreign_field_direct_targeting_rejected(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member');
+        $guideState = $init['guide_state'];
+
+        $turn = $this->formAi->processGuidedTurn('Package Gold kar do', 'member_profile_user_summary', 'member', [], $guideState);
+
+        $this->assertFalse($turn['success']);
+        $this->assertEquals('invalid_field', $turn['status']);
+        $this->assertEmpty($turn['form_updates']);
+        $this->assertStringContainsString('उपलब्ध नहीं है', $turn['speech']);
+    }
+
+    /**
+     * Test 49: Natural Hindi, Hinglish, and English field variants resolve correctly
+     */
+    public function test_natural_multilingual_field_variants_resolve(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_profile_user_summary', 'member');
+        $guideState = $init['guide_state'];
+        $currentFields = ['name' => 'Test', 'mobile' => '1234567890', 'country' => 'India'];
+
+        // 1. Hindi Devanagari: "मोबाइल ९८७६५४३२१० कर दो"
+        $turnHi = $this->formAi->processGuidedTurn('मोबाइल ९८७६५४३२१० कर दो', 'member_profile_user_summary', 'member', $currentFields, $guideState);
+        $this->assertTrue($turnHi['success']);
+        $this->assertEquals('mobile', $turnHi['form_updates'][0]['field']);
+        $this->assertEquals('9876543210', $turnHi['form_updates'][0]['value']);
+
+        // 2. Hinglish: "Mobile number change karke 9123456780 kar do"
+        $turnHinglish = $this->formAi->processGuidedTurn('Mobile number change karke 9123456780 kar do', 'member_profile_user_summary', 'member', $currentFields, $guideState);
+        $this->assertTrue($turnHinglish['success']);
+        $this->assertEquals('mobile', $turnHinglish['form_updates'][0]['field']);
+        $this->assertEquals('9123456780', $turnHinglish['form_updates'][0]['value']);
+
+        // 3. English: "Change country to Belgium"
+        $turnEn = $this->formAi->processGuidedTurn('Change country to Belgium', 'member_profile_user_summary', 'member', $currentFields, $guideState);
+        $this->assertTrue($turnEn['success']);
+        $this->assertEquals('country', $turnEn['form_updates'][0]['field']);
+        $this->assertEquals('Belgium', $turnEn['form_updates'][0]['value']);
+    }
+
+    /**
+     * Test 50: Contrastive numeric correction: "Amount pehle 1000 tha ab 2000 kar do"
+     */
+    public function test_contrastive_numeric_correction_direct_targeting(): void
+    {
+        $init = $this->formAi->initGuidedSession('member_staking', 'member');
+        $guideState = $init['guide_state'];
+        $currentFields = ['stak_package' => 'Gold', 'amount' => 1000];
+
+        $turn = $this->formAi->processGuidedTurn('Amount pehle 1000 tha ab 2000 kar do', 'member_staking', 'member', $currentFields, $guideState);
+
+        $this->assertTrue($turn['success']);
+        $this->assertEquals('amount', $turn['form_updates'][0]['field']);
+        $this->assertEquals(2000, $turn['form_updates'][0]['value']);
     }
 }

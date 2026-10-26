@@ -409,6 +409,7 @@ class IraFormRegistry
 
         'member_profile_user_summary' => [
             'key' => 'member_profile_user_summary',
+            'form_type' => 'edit',
             'portal' => 'member',
             'roles' => ['member'],
             'path' => '/member/profile/user-summary',
@@ -2037,5 +2038,46 @@ class IraFormRegistry
         }
 
         return null;
+    }
+
+    /**
+     * Check if a form is an edit/update form where pre-existing values remain editable.
+     *
+     * @param string|array $form Form key or schema array
+     * @return bool
+     */
+    public static function isEditForm(string|array $form): bool
+    {
+        $schema = is_array($form) ? $form : self::getForm($form);
+        if (!$schema) {
+            return false;
+        }
+
+        // 1. Explicit form_type or mode
+        $formType = strtolower((string) ($schema['form_type'] ?? ($schema['mode'] ?? '')));
+        if (in_array($formType, ['edit', 'update', 'setting', 'profile_edit'], true)) {
+            return true;
+        }
+
+        // 2. Title, purpose, key, or selector indicators
+        $title = strtolower((string) ($schema['title'] ?? ''));
+        $purpose = strtolower((string) ($schema['purpose'] ?? ''));
+        $key = strtolower((string) ($schema['key'] ?? (is_string($form) ? $form : '')));
+        $selector = strtolower((string) ($schema['selector'] ?? ''));
+
+        if (str_contains($title, 'edit') || str_contains($title, 'update') || str_contains($title, 'setting') || str_contains($title, 'profile')) {
+            return true;
+        }
+        if (str_contains($purpose, 'update') || str_contains($purpose, 'edit') || str_contains($purpose, 'modify')) {
+            return true;
+        }
+        if (str_contains($key, 'profile') || str_contains($key, 'update') || str_contains($key, 'setting')) {
+            return true;
+        }
+        if (str_contains($selector, 'insertprofile') || str_contains($selector, 'update')) {
+            return true;
+        }
+
+        return false;
     }
 }

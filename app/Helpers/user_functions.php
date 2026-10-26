@@ -123,14 +123,17 @@ function updateDownline($sponsorid)
 
 function todayWithdrawals($memberid)
 {
-    $var = WithdrawalRequest::where([['memberid', $memberid], ['status', 'Approved']])->whereDate('created_at', date('Y-m-d'))->sum('gross_amount');
-    return $var;
+    $amountCol = \Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'gross_amount') ? 'gross_amount' : 'amount';
+    $dateCol = \Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'payment_date') ? 'payment_date' : 'created_at';
+    $var = WithdrawalRequest::where([['memberid', $memberid], ['status', 'Approved']])->whereDate($dateCol, date('Y-m-d'))->sum($amountCol);
+    return $var ?? 0;
 }
 
 function totalWithdrawals($memberid)
 {
-    $var = WithdrawalRequest::where([['memberid', $memberid], ['status', 'Approved']])->sum('gross_amount');
-    return $var;
+    $amountCol = \Illuminate\Support\Facades\Schema::hasColumn('withdrawal_requests', 'gross_amount') ? 'gross_amount' : 'amount';
+    $var = WithdrawalRequest::where([['memberid', $memberid], ['status', 'Approved']])->sum($amountCol);
+    return $var ?? 0;
 }
 
 function totalDeposit($memberid)
