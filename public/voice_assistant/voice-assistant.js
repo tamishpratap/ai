@@ -2,6 +2,7 @@ import { AssistantApi } from './api-client.js';
 import { AudioCapture } from './audio-capture.js';
 import { StreamingPcmPlayer } from './audio-player.js';
 import { GeminiLiveClient } from './gemini-live-client.js';
+import { KORE_INTRO_PCM_BASE64 } from './kore-intro-pcm.js';
 
 const config = window.VOICE_ASSISTANT_CONFIG;
 const app = document.querySelector('.assistant-app');
@@ -13,51 +14,10 @@ const ui = {
   transcript: document.querySelector('.transcript-messages'),
   keyboard: document.querySelector('.keyboard-panel'),
   prompt: document.querySelector('#prompt'),
-  micButtons: [...document.querySelectorAll('.microphone-control, .mobile-mic')],
-  canvas: document.querySelector('#liveWaveform'),
+  micButtons: [...document.querySelectorAll('.microphone-control, .mobile-mic, .mobile-microphone-button')],
   pdf: document.querySelector('#pdfUpload'),
-
-  // Gemini API Key elements
-  openModalBtn: document.querySelector('#openGeminiModalBtn'),
-  settingsKeyBadge: document.querySelector('#settingsKeyBadge'),
-  modalOverlay: document.querySelector('#geminiModalOverlay'),
-  modalCloseBtn: document.querySelector('#closeGeminiModalBtn'),
-  keyInput: document.querySelector('#geminiApiKeyInput'),
-  toggleEyeBtn: document.querySelector('#toggleKeyVisibilityBtn'),
-  statusCard: document.querySelector('#keyStatusCard'),
-  statusTitle: document.querySelector('#statusTitle'),
-  statusDesc: document.querySelector('#statusDesc'),
-  keyFeedback: document.querySelector('#keyFeedback'),
-  testBtn: document.querySelector('#testKeyBtn'),
-  testSpinner: document.querySelector('#testSpinner'),
-  testBtnText: document.querySelector('#testBtnText'),
-  saveBtn: document.querySelector('#saveKeyBtn'),
-  removeBtn: document.querySelector('#removeKeyBtn'),
-
-  // Edit Profile elements
-  openProfileModalBtn: document.querySelector('#openProfileModalBtn'),
-  profileModalOverlay: document.querySelector('#profileModalOverlay'),
-  closeProfileModalBtn: document.querySelector('#closeProfileModalBtn'),
-  editProfileForm: document.querySelector('#editProfileForm'),
-  profileImageInput: document.querySelector('#profileImageInput'),
-  btnTriggerPhotoUpload: document.querySelector('#btnTriggerPhotoUpload'),
-  modalAvatarPreview: document.querySelector('#modalAvatarPreview'),
-  previewAvatarImg: document.querySelector('#previewAvatarImg'),
-  previewAvatarInitial: document.querySelector('#previewAvatarInitial'),
-  editProfileName: document.querySelector('#editProfileName'),
-  editProfileEmail: document.querySelector('#editProfileEmail'),
-  editProfileMobile: document.querySelector('#editProfileMobile'),
-  editProfilePassword: document.querySelector('#editProfilePassword'),
-  profileFeedback: document.querySelector('#profileFeedback'),
-  saveProfileBtn: document.querySelector('#saveProfileBtn'),
-  profileSaveSpinner: document.querySelector('#profileSaveSpinner'),
-  profileSaveBtnText: document.querySelector('#profileSaveBtnText'),
-
-  // Dashboard profile display elements
   dashboardGreeting: document.querySelector('#dashboardGreeting'),
-  dashboardProfileName: document.querySelector('#dashboardProfileName'),
-  menuProfileName: document.querySelector('#menuProfileName'),
-  dashboardAvatar: document.querySelector('#dashboardAvatar'),
+  dashboardLiveTime: document.querySelector('#dashboardLiveTime'),
 };
 
 const state = {
@@ -72,10 +32,23 @@ const player = new StreamingPcmPlayer({
 });
 
 function fitReferenceCanvas() {
-  const scale = Math.min(window.innerWidth / 1536, window.innerHeight / 1024);
-  app.style.setProperty('--canvas-scale', String(scale));
-  app.style.setProperty('--canvas-left', `${(window.innerWidth - 1536 * scale) / 2}px`);
-  app.style.setProperty('--canvas-top', `${(window.innerHeight - 1024 * scale) / 2}px`);
+  const isMobile = window.innerWidth <= 991 || (window.innerHeight > window.innerWidth && window.innerWidth < 1100);
+  const appEl = document.querySelector('.assistant-app');
+  if (!appEl) return;
+  if (isMobile) {
+    appEl.classList.add('is-mobile-view');
+    appEl.classList.remove('is-desktop-view');
+    appEl.style.removeProperty('--canvas-scale');
+    appEl.style.removeProperty('--canvas-left');
+    appEl.style.removeProperty('--canvas-top');
+  } else {
+    appEl.classList.add('is-desktop-view');
+    appEl.classList.remove('is-mobile-view');
+    const scale = Math.min(window.innerWidth / 1536, window.innerHeight / 1024);
+    appEl.style.setProperty('--canvas-scale', String(scale));
+    appEl.style.setProperty('--canvas-left', `${(window.innerWidth - 1536 * scale) / 2}px`);
+    appEl.style.setProperty('--canvas-top', `${(window.innerHeight - 1024 * scale) / 2}px`);
+  }
 }
 
 function togglePanel(panel, trigger = null) {
@@ -88,270 +61,37 @@ function togglePanel(panel, trigger = null) {
 }
 
 // ----------------------------------------------------
-// Gemini API Key Modal & Key Management
+// Live Clock & Date Display
 // ----------------------------------------------------
-function updateApiKeyStatus() {
-  const key = api.getApiKey();
-  const hasKey = Boolean(key && key.trim().length > 0);
-
-  if (ui.settingsKeyBadge) {
-    ui.settingsKeyBadge.classList.toggle('active', hasKey);
-  }
-
-  if (ui.statusCard) {
-    ui.statusCard.classList.toggle('active', hasKey);
-  }
-
-  if (ui.statusTitle) {
-    ui.statusTitle.textContent = hasKey ? 'API Key Configured & Ready' : 'API Key Not Set';
-  }
-
-  if (ui.statusDesc) {
-    ui.statusDesc.textContent = hasKey
-      ? `Active Key: ${key.slice(0, 7)}••••••••${key.slice(-4)}`
-      : 'Please add your Google Gemini API key to activate voice and assistant capabilities.';
-  }
-
-  if (ui.removeBtn) {
-    ui.removeBtn.style.display = hasKey ? 'inline-flex' : 'none';
-  }
-
-  if (ui.keyInput && !ui.modalOverlay?.classList.contains('open')) {
-    ui.keyInput.value = hasKey ? key : '';
-  }
+function updateLiveClock() {
+  const timeEls = document.querySelectorAll('#dashboardLiveTime, .dashboard-live-clock');
+  if (!timeEls.length) return;
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  timeEls.forEach((el) => {
+    el.innerHTML = `${timeStr}<small>${dateStr}</small>`;
+  });
 }
-
-function openGeminiModal() {
-  document.querySelectorAll('.popover.open, .keyboard-panel.open').forEach((item) => item.classList.remove('open'));
-  const key = api.getApiKey();
-  if (ui.keyInput) {
-    ui.keyInput.value = key || '';
-  }
-  hideKeyFeedback();
-  updateApiKeyStatus();
-  ui.modalOverlay?.classList.add('open');
-  ui.modalOverlay?.setAttribute('aria-hidden', 'false');
-  setTimeout(() => ui.keyInput?.focus(), 150);
-}
-
-function closeGeminiModal() {
-  ui.modalOverlay?.classList.remove('open');
-  ui.modalOverlay?.setAttribute('aria-hidden', 'true');
-  hideKeyFeedback();
-}
-
-function showKeyFeedback(message, type = 'success') {
-  if (!ui.keyFeedback) return;
-  ui.keyFeedback.textContent = message;
-  ui.keyFeedback.className = `key-validation-feedback ${type}`;
-  ui.keyFeedback.style.display = 'block';
-}
-
-function hideKeyFeedback() {
-  if (!ui.keyFeedback) return;
-  ui.keyFeedback.style.display = 'none';
-  ui.keyFeedback.textContent = '';
-}
-
-function toggleKeyVisibility() {
-  if (!ui.keyInput) return;
-  const isPass = ui.keyInput.type === 'password';
-  ui.keyInput.type = isPass ? 'text' : 'password';
-  const openIcon = ui.toggleEyeBtn?.querySelector('.icon-eye-open');
-  const closedIcon = ui.toggleEyeBtn?.querySelector('.icon-eye-closed');
-  if (openIcon) openIcon.style.display = isPass ? 'none' : 'block';
-  if (closedIcon) closedIcon.style.display = isPass ? 'block' : 'none';
-}
-
-async function handleTestKey() {
-  const key = (ui.keyInput?.value || '').trim();
-  if (!key) {
-    showKeyFeedback('Please enter an API key to test.', 'error');
-    return;
-  }
-
-  if (ui.testSpinner) ui.testSpinner.style.display = 'inline-block';
-  if (ui.testBtnText) ui.testBtnText.textContent = 'Testing...';
-  if (ui.testBtn) ui.testBtn.disabled = true;
-  hideKeyFeedback();
-
-  try {
-    const result = await api.verifyKey(key);
-    const modelInfo = result?.active_model ? ` (${result.active_model})` : '';
-    showKeyFeedback((result?.message || 'Gemini API Key is valid and active!') + modelInfo, 'success');
-  } catch (error) {
-    showKeyFeedback(error.message || 'Verification failed. Please check the API key.', 'error');
-  } finally {
-    if (ui.testSpinner) ui.testSpinner.style.display = 'none';
-    if (ui.testBtnText) ui.testBtnText.textContent = 'Test Connection';
-    if (ui.testBtn) ui.testBtn.disabled = false;
-  }
-}
-
-function handleSaveKey() {
-  const key = (ui.keyInput?.value || '').trim();
-  if (!key) {
-    showKeyFeedback('Please enter a valid Gemini API Key.', 'error');
-    return;
-  }
-
-  localStorage.setItem('user_gemini_api_key', key);
-  updateApiKeyStatus();
-  showKeyFeedback('Gemini API Key saved successfully!', 'success');
-  toast('Gemini API Key saved.');
-
-  state.live?.close();
-  state.live = null;
-  state.conversationId = null;
-
-  setTimeout(() => {
-    closeGeminiModal();
-  }, 900);
-}
-
-function handleRemoveKey() {
-  localStorage.removeItem('user_gemini_api_key');
-  if (ui.keyInput) ui.keyInput.value = '';
-  updateApiKeyStatus();
-  showKeyFeedback('Gemini API key has been removed.', 'error');
-  toast('Gemini API Key removed.');
-
-  state.live?.close();
-  state.live = null;
-  state.conversationId = null;
-}
-
-// ----------------------------------------------------
-// Edit Profile Modal & Photo Upload
-// ----------------------------------------------------
-function openProfileModal() {
-  document.querySelectorAll('.popover.open, .keyboard-panel.open').forEach((item) => item.classList.remove('open'));
-  hideProfileFeedback();
-  ui.profileModalOverlay?.classList.add('open');
-  ui.profileModalOverlay?.setAttribute('aria-hidden', 'false');
-  setTimeout(() => ui.editProfileName?.focus(), 150);
-}
-
-function closeProfileModal() {
-  ui.profileModalOverlay?.classList.remove('open');
-  ui.profileModalOverlay?.setAttribute('aria-hidden', 'true');
-  hideProfileFeedback();
-}
-
-function showProfileFeedback(message, type = 'success') {
-  if (!ui.profileFeedback) return;
-  ui.profileFeedback.textContent = message;
-  ui.profileFeedback.className = `key-validation-feedback ${type}`;
-  ui.profileFeedback.style.display = 'block';
-}
-
-function hideProfileFeedback() {
-  if (!ui.profileFeedback) return;
-  ui.profileFeedback.style.display = 'none';
-  ui.profileFeedback.textContent = '';
-}
-
-function handleAvatarPreview(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    if (ui.previewAvatarImg) {
-      ui.previewAvatarImg.src = e.target.result;
-      ui.previewAvatarImg.style.display = 'block';
-    }
-    if (ui.previewAvatarInitial) {
-      ui.previewAvatarInitial.style.display = 'none';
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-async function handleProfileSubmit(event) {
-  event.preventDefault();
-  const form = ui.editProfileForm;
-  if (!form) return;
-
-  hideProfileFeedback();
-  if (ui.profileSaveSpinner) ui.profileSaveSpinner.style.display = 'inline-block';
-  if (ui.profileSaveBtnText) ui.profileSaveBtnText.textContent = 'Saving...';
-  if (ui.saveProfileBtn) ui.saveProfileBtn.disabled = true;
-
-  const formData = new FormData(form);
-  const endpoint = config?.endpoints?.profile || '/api/assistant/profile';
-
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'X-CSRF-TOKEN': config.csrfToken,
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'application/json',
-      },
-    });
-
-    const data = await response.json();
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Could not update profile.');
-    }
-
-    showProfileFeedback('Profile updated successfully!', 'success');
-    toast('Profile and photo updated!');
-
-    // Update real-time UI elements
-    const member = data.member;
-    const hour = new Date().getHours();
-    const timeOfDay = hour < 12 ? 'Morning' : (hour < 17 ? 'Afternoon' : 'Evening');
-
-    if (ui.dashboardGreeting) {
-      ui.dashboardGreeting.textContent = `Good ${timeOfDay}, ${member.name} 👋`;
-    }
-    if (ui.dashboardProfileName) {
-      ui.dashboardProfileName.textContent = member.name;
-    }
-    if (ui.menuProfileName) {
-      ui.menuProfileName.textContent = member.name;
-    }
-
-    // Update avatar on dashboard
-    if (ui.dashboardAvatar) {
-      if (member.avatar_url) {
-        ui.dashboardAvatar.innerHTML = `<img src="${member.avatar_url}" alt="${member.name}">`;
-      } else {
-        ui.dashboardAvatar.innerHTML = `<span>${member.avatar_initial}</span>`;
-      }
-    }
-
-    if (ui.editProfilePassword) {
-      ui.editProfilePassword.value = '';
-    }
-
-    setTimeout(() => {
-      closeProfileModal();
-    }, 1200);
-  } catch (error) {
-    showProfileFeedback(error.message, 'error');
-  } finally {
-    if (ui.profileSaveSpinner) ui.profileSaveSpinner.style.display = 'none';
-    if (ui.profileSaveBtnText) ui.profileSaveBtnText.textContent = 'Save Profile';
-    if (ui.saveProfileBtn) ui.saveProfileBtn.disabled = false;
-  }
-}
+updateLiveClock();
+setInterval(updateLiveClock, 1000);
 
 // ----------------------------------------------------
 // Mode & State Management
 // ----------------------------------------------------
 function setMode(mode, detail = '') {
   state.mode = mode;
-  app.dataset.assistantState = mode.toLowerCase();
+  if (app) app.dataset.assistantState = mode.toLowerCase();
   const labels = {
     IDLE: 'Tap to speak to JARVIS', CONNECTING: 'Connecting to JARVIS...', LISTENING: 'JARVIS is listening...',
     PROCESSING: 'JARVIS is processing...', THINKING: 'JARVIS is thinking...', SPEAKING: 'JARVIS is speaking...',
     INTERRUPTED: 'Interrupted — JARVIS listening...', ERROR: 'Something went wrong. Try again.',
     DISCONNECTED: 'Disconnected. Reconnecting...',
   };
-  ui.status.forEach((element) => { element.textContent = detail || labels[mode] || mode; });
-  ui.micButtons.forEach((button) => {
+  const activeStatusEls = document.querySelectorAll('[data-assistant-status]');
+  activeStatusEls.forEach((element) => { element.textContent = detail || labels[mode] || mode; });
+  const micBtns = document.querySelectorAll('.microphone-control, .mobile-mic, .mobile-microphone-button');
+  micBtns.forEach((button) => {
     button.classList.toggle('listening', mode === 'LISTENING');
     button.setAttribute('aria-pressed', String(state.listening));
     button.setAttribute('aria-label', state.listening ? 'Stop listening' : 'Start listening');
@@ -414,6 +154,171 @@ async function ensureLiveSession() {
 
 let browserRecognition = null;
 let speechLevelTimer = null;
+let hasGivenIntro = false;
+let availableVoices = [];
+
+function refreshVoices() {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    availableVoices = window.speechSynthesis.getVoices() || [];
+  }
+}
+refreshVoices();
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = refreshVoices;
+}
+
+function getKoreVoice(selectedLang = 'en-US') {
+  const voices = (availableVoices && availableVoices.length) ? availableVoices : (window.speechSynthesis?.getVoices() || []);
+  if (!voices.length) return null;
+
+  const isHindi = String(selectedLang).toLowerCase().startsWith('hi');
+
+  // 1. Direct match for 'kore' if available in system or extensions
+  const directKore = voices.find((v) => /kore/i.test(v.name));
+  if (directKore) return directKore;
+
+  // 2. High-fidelity Smooth Neural / Natural Voices (Kore signature sound: warm, clear, calm female)
+  const neuralPriority = isHindi
+    ? [
+        /swara.*online.*natural/i,
+        /swara.*natural/i,
+        /swara.*online/i,
+        /swara/i,
+        /google.*हिन्दी/i,
+        /google.*hindi/i,
+        /kalpana/i,
+        /heera.*natural/i,
+        /heera/i,
+        /neerja.*natural/i,
+        /neerja.*online/i,
+        /neerja/i
+      ]
+    : [
+        /neerja.*online.*natural/i,
+        /neerja.*natural/i,
+        /neerja.*online/i,
+        /jenny.*online.*natural/i,
+        /jenny.*natural/i,
+        /aria.*online.*natural/i,
+        /aria.*natural/i,
+        /google.*uk.*female/i,
+        /google.*us.*female/i,
+        /google.*india/i,
+        /zira/i,
+        /natural/i
+      ];
+
+  for (const pattern of neuralPriority) {
+    const match = voices.find((v) => pattern.test(v.name) && !/desktop.*david|male|david|george|mark|ravi/i.test(v.name));
+    if (match) return match;
+  }
+
+  // 3. Any online/natural female voice matching language
+  const langPrefix = isHindi ? 'hi' : 'en';
+  const naturalVoice = voices.find((v) =>
+    v.lang.toLowerCase().startsWith(langPrefix) &&
+    /online|natural|neural/i.test(v.name) &&
+    !/male|david|george|mark|ravi/i.test(v.name)
+  );
+  if (naturalVoice) return naturalVoice;
+
+  // 4. Any female voice in target language
+  const femaleVoice = voices.find((v) =>
+    v.lang.toLowerCase().startsWith(langPrefix) &&
+    /female|woman|zira/i.test(v.name) &&
+    !/male|david|george|mark|ravi/i.test(v.name)
+  );
+  if (femaleVoice) return femaleVoice;
+
+  // 5. Any female voice available across the system
+  const anyFemale = voices.find((v) => /female|woman|zira/i.test(v.name) && !/male|david|george|mark|ravi/i.test(v.name));
+  if (anyFemale) return anyFemale;
+
+  return voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix) && !/male|david|george|mark/i.test(v.name)) 
+    || voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix)) 
+    || voices[0] 
+    || null;
+}
+
+function speakWithBrowserKore(introText, cleanup) {
+  if (!('speechSynthesis' in window)) {
+    cleanup();
+    return;
+  }
+  try { window.speechSynthesis.cancel(); } catch (_) {}
+  const utterance = new SpeechSynthesisUtterance(introText);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.98;
+  utterance.pitch = 1.02;
+  utterance.volume = 1;
+
+  const koreVoice = getKoreVoice('en-US');
+  if (koreVoice) utterance.voice = koreVoice;
+
+  let visualTimer = setInterval(() => {
+    setLevel(0.45 + Math.random() * 0.4);
+  }, 100);
+
+  const done = () => {
+    clearInterval(visualTimer);
+    cleanup();
+  };
+
+  utterance.onend = done;
+  utterance.onerror = done;
+  setTimeout(done, 8500);
+  window.speechSynthesis.speak(utterance);
+}
+
+function playAssistantIntro() {
+  return new Promise((resolve) => {
+    const introText = "Hey! I’m here whenever you need me. Ask me something, tell me what you need, or simply start talking. I’m listening.";
+
+    setMode('SPEAKING', 'Kore: "Hey! I’m here whenever you need me..."');
+    appendTranscript('assistant', introText);
+
+    let resolved = false;
+    const cleanup = () => {
+      if (resolved) return;
+      resolved = true;
+      setLevel(0);
+      resolve();
+    };
+
+    // 1. Play real Google Gemini "Kore" Voice via StreamingPcmPlayer (Web Audio API)
+    try {
+      if (KORE_INTRO_PCM_BASE64 && player) {
+        const originalOnIdle = player.onIdle;
+        player.onIdle = () => {
+          player.onIdle = originalOnIdle;
+          originalOnIdle?.();
+          cleanup();
+        };
+        player.enqueue(KORE_INTRO_PCM_BASE64).catch((err) => {
+          console.warn('PCM enqueue error:', err);
+          speakWithBrowserKore(introText, cleanup);
+        });
+        setTimeout(cleanup, 8500);
+        return;
+      }
+    } catch (pcmErr) {
+      console.warn('PCM playback failed:', pcmErr);
+    }
+
+    // 2. Fallback to WAV audio file with real Kore voice
+    try {
+      const audio = new Audio('/voice_assistant/kore-intro.wav');
+      audio.onended = cleanup;
+      audio.onerror = () => speakWithBrowserKore(introText, cleanup);
+      audio.play().catch(() => speakWithBrowserKore(introText, cleanup));
+      setTimeout(cleanup, 8500);
+      return;
+    } catch (_) {}
+
+    // 3. Fallback to SpeechSynthesis
+    speakWithBrowserKore(introText, cleanup);
+  });
+}
 
 function startBrowserSpeechRecognition() {
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -538,7 +443,18 @@ async function stopListening() {
 }
 
 async function toggleListening() {
-  if (state.listening) await stopListening(); else await startListening();
+  if (state.listening) {
+    await stopListening();
+    return;
+  }
+
+  // User mic click karne par pehle AI apna intro bolega
+  if (!hasGivenIntro) {
+    hasGivenIntro = true;
+    await playAssistantIntro();
+  }
+
+  await startListening();
 }
 
 async function handleLiveMessage(message) {
@@ -625,8 +541,14 @@ async function sendText(text, quickAction = null) {
 function speakFallback(text) {
   if (!window.speechSynthesis) return;
   speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text.replace(/[*#`]/g, ''));
-  utterance.lang = /[\u0900-\u097F]/.test(text) ? 'hi-IN' : 'en-IN';
+  const clean = String(text || '').replace(/[*#`]/g, '');
+  const utterance = new SpeechSynthesisUtterance(clean);
+  const lang = /[\u0900-\u097F]/.test(clean) ? 'hi-IN' : 'en-US';
+  utterance.lang = lang;
+  utterance.rate = 0.98;
+  utterance.pitch = 1.02;
+  const koreVoice = getKoreVoice(lang);
+  if (koreVoice) utterance.voice = koreVoice;
   speechSynthesis.speak(utterance);
 }
 
@@ -661,14 +583,20 @@ async function refreshStats() {
   } catch (_) {}
 }
 
-function setLevel(level) { state.level = level; app.style.setProperty('--audio-level', String(level)); }
+function setLevel(level) {
+  state.level = level;
+  if (app) app.style.setProperty('--audio-level', String(level));
+  document.querySelectorAll('.assistant-app').forEach(el => el.style.setProperty('--audio-level', String(level)));
+}
 
 function drawWaveform() {
-  const canvas = ui.canvas;
-  if (canvas) {
+  const canvases = document.querySelectorAll('.live-waveform');
+  canvases.forEach((canvas) => {
+    if (canvas.offsetParent === null) return; // Skip hidden canvas
     const context = canvas.getContext('2d');
-    const width = canvas.width = canvas.clientWidth * devicePixelRatio;
-    const height = canvas.height = canvas.clientHeight * devicePixelRatio;
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.width = canvas.clientWidth * dpr;
+    const height = canvas.height = canvas.clientHeight * dpr;
     context.clearRect(0, 0, width, height);
     const bars = 72;
     const playback = player.getVisualData(bars);
@@ -677,7 +605,7 @@ function drawWaveform() {
     state.visualLevel += (targetLevel - state.visualLevel) * smoothing;
 
     for (let i = 0; i < bars; i += 1) {
-      if (Math.abs(i - bars / 2) < 8) continue;
+      if (Math.abs(i - bars / 2) < 6) continue;
       const center = Math.abs(i - bars / 2) / (bars / 2);
       const frequency = state.mode === 'SPEAKING' ? playback.bars[i] : 0;
       const liveActivity = Math.max(state.visualLevel, frequency * 0.9);
@@ -690,59 +618,33 @@ function drawWaveform() {
       context.fillStyle = gradient;
       context.fillRect(x, (height - barHeight) / 2, Math.max(2, width / bars / 2), barHeight);
     }
-  }
+  });
   requestAnimationFrame(drawWaveform);
 }
 
 // ----------------------------------------------------
 // Event Listeners
 // ----------------------------------------------------
-ui.micButtons.forEach((button) => button.addEventListener('click', toggleListening));
-
-// Gemini API Key Modal Controls
-ui.openModalBtn?.addEventListener('click', (event) => {
-  event.stopPropagation();
-  openGeminiModal();
-});
-ui.modalCloseBtn?.addEventListener('click', closeGeminiModal);
-ui.toggleEyeBtn?.addEventListener('click', toggleKeyVisibility);
-ui.testBtn?.addEventListener('click', handleTestKey);
-ui.saveBtn?.addEventListener('click', handleSaveKey);
-ui.removeBtn?.addEventListener('click', handleRemoveKey);
-ui.modalOverlay?.addEventListener('click', (event) => {
-  if (event.target === ui.modalOverlay) closeGeminiModal();
+document.querySelectorAll('.microphone-control, .mobile-mic, .mobile-microphone-button').forEach((button) => {
+  button.addEventListener('click', toggleListening);
 });
 
-// Edit Profile Modal Controls
-ui.openProfileModalBtn?.addEventListener('click', (event) => {
-  event.stopPropagation();
-  openProfileModal();
-});
-ui.closeProfileModalBtn?.addEventListener('click', closeProfileModal);
-ui.btnTriggerPhotoUpload?.addEventListener('click', () => ui.profileImageInput?.click());
-ui.modalAvatarPreview?.addEventListener('click', () => ui.profileImageInput?.click());
-ui.profileImageInput?.addEventListener('change', () => {
-  if (ui.profileImageInput.files && ui.profileImageInput.files[0]) {
-    handleAvatarPreview(ui.profileImageInput.files[0]);
-  }
-});
-ui.editProfileForm?.addEventListener('submit', handleProfileSubmit);
-ui.profileModalOverlay?.addEventListener('click', (event) => {
-  if (event.target === ui.profileModalOverlay) closeProfileModal();
+document.querySelectorAll('.settings-control').forEach((button) => {
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    togglePanel(document.querySelector('.settings-menu'), button);
+  });
 });
 
-document.querySelector('.profile-control')?.addEventListener('click', (event) => {
-  event.stopPropagation(); togglePanel(document.querySelector('.profile-menu'), event.currentTarget);
+document.querySelectorAll('.keyboard-control').forEach((button) => {
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    togglePanel(ui.keyboard, button);
+    setTimeout(() => ui.prompt?.focus(), 150);
+  });
 });
-document.querySelector('.settings-control')?.addEventListener('click', (event) => {
-  event.stopPropagation(); togglePanel(document.querySelector('.settings-menu'));
-});
-document.querySelector('.keyboard-control')?.addEventListener('click', (event) => {
-  event.stopPropagation(); togglePanel(ui.keyboard); setTimeout(() => ui.prompt?.focus(), 150);
-});
+
 document.querySelector('.stop-audio')?.addEventListener('click', () => { player.stop(); setMode(state.listening ? 'LISTENING' : 'IDLE'); });
-document.querySelector('.notification-control')?.addEventListener('click', () => toast('No new notifications.'));
-document.querySelector('.language-control')?.addEventListener('click', () => toast('Auto language: English, Hindi, and Hinglish.'));
 
 document.querySelector('.keyboard-panel')?.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -763,9 +665,10 @@ document.querySelectorAll('[data-action]').forEach((button) => button.addEventLi
 ui.pdf?.addEventListener('change', () => { if (ui.pdf.files[0]) summarizePdf(ui.pdf.files[0]); ui.pdf.value = ''; });
 window.addEventListener('beforeunload', () => { state.intentionalClose = true; state.live?.close(); state.capture?.stop(); player.close(); });
 window.addEventListener('resize', fitReferenceCanvas, { passive: true });
+window.addEventListener('orientationchange', fitReferenceCanvas, { passive: true });
 
-app.addEventListener('click', (event) => {
-  if (!event.target.closest('.popover,.keyboard-panel,.profile-control,.settings-control,.keyboard-control,#geminiModalOverlay,#profileModalOverlay')) {
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.popover,.keyboard-panel,.settings-control,.keyboard-control')) {
     document.querySelectorAll('.popover.open,.keyboard-panel.open').forEach((panel) => panel.classList.remove('open'));
   }
 });
@@ -773,14 +676,11 @@ app.addEventListener('click', (event) => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     document.querySelectorAll('.popover.open,.keyboard-panel.open').forEach((panel) => panel.classList.remove('open'));
-    if (ui.modalOverlay?.classList.contains('open')) closeGeminiModal();
-    if (ui.profileModalOverlay?.classList.contains('open')) closeProfileModal();
   }
 });
 
 // Initialization
 fitReferenceCanvas();
-updateApiKeyStatus();
 setMode('IDLE');
 refreshStats();
 drawWaveform();
